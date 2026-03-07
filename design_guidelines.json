@@ -1,0 +1,161 @@
+{
+  "brand_identity": {
+    "name": "ModulAI",
+    "mission": "Empowering Indonesian Teachers with AI-driven documentation tools.",
+    "tone": "Professional, Warm, Efficient, Trustworthy",
+    "archetype": "The Smart Assistant"
+  },
+  "design_principles": [
+    "Clarity First: Teachers are busy. Interfaces must be scanable.",
+    "Warm Technology: Use Navy for trust, Orange for energy/warmth.",
+    "Local Context: Design for Indonesian needs (WA integration, familiar payment flows).",
+    "Dense but Breathing: Dashboards are data-rich, Landing pages are airy."
+  ],
+  "color_system": {
+    "primary": {
+      "DEFAULT": "#1E3A5F",
+      "50": "#F0F4F8",
+      "100": "#D9E2EC",
+      "200": "#BCCCDC",
+      "300": "#9FB3C8",
+      "400": "#829AB1",
+      "500": "#627D98",
+      "600": "#486581",
+      "700": "#334E68",
+      "800": "#243B53",
+      "900": "#102A43"
+    },
+    "secondary": {
+      "DEFAULT": "#F4820A",
+      "50": "#FFF5EB",
+      "100": "#FFE8CC",
+      "500": "#F4820A",
+      "600": "#D66E00",
+      "700": "#B85C00"
+    },
+    "accent": {
+      "DEFAULT": "#10B981",
+      "green": "#10B981",
+      "red": "#EF4444"
+    },
+    "neutral": {
+      "background": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "border": "#E2E8F0",
+      "text_primary": "#0F172A",
+      "text_secondary": "#475569",
+      "text_muted": "#94A3B8"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Plus Jakarta Sans, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-6xl font-bold tracking-tight",
+      "h2": "text-3xl md:text-4xl font-bold tracking-tight",
+      "h3": "text-2xl font-semibold tracking-tight",
+      "h4": "text-xl font-semibold",
+      "body_lg": "text-lg leading-relaxed",
+      "body": "text-base leading-relaxed text-slate-600",
+      "small": "text-sm font-medium text-slate-500",
+      "tiny": "text-xs font-medium uppercase tracking-wider text-slate-400"
+    }
+  },
+  "layout_strategies": {
+    "spacing": {
+      "container": "container mx-auto px-4 md:px-6 lg:px-8",
+      "section_padding": "py-16 md:py-24",
+      "card_padding": "p-6 md:p-8"
+    },
+    "grids": {
+      "bento": "grid grid-cols-1 md:grid-cols-3 gap-6",
+      "dashboard": "grid grid-cols-1 md:grid-cols-12 gap-6",
+      "features": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+    },
+    "surfaces": {
+      "card": "bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200",
+      "glass": "bg-white/80 backdrop-blur-md border-b border-white/20",
+      "active": "border-orange-500 ring-1 ring-orange-500 bg-orange-50"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#1E3A5F] text-white hover:bg-[#162B47] shadow-lg shadow-navy-900/20 rounded-lg px-6 py-3 font-medium transition-all active:scale-95",
+      "secondary": "bg-[#F4820A] text-white hover:bg-[#D66E00] shadow-lg shadow-orange-500/20 rounded-lg px-6 py-3 font-medium transition-all active:scale-95",
+      "outline": "border-2 border-slate-200 bg-transparent hover:bg-slate-50 text-slate-900 rounded-lg px-6 py-3 font-medium transition-all",
+      "ghost": "bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg px-4 py-2"
+    },
+    "inputs": {
+      "default": "h-11 rounded-lg border-slate-200 focus:border-[#1E3A5F] focus:ring-[#1E3A5F]",
+      "error": "border-red-500 focus:ring-red-500"
+    },
+    "badges": {
+      "default": "bg-slate-100 text-slate-700 hover:bg-slate-200",
+      "primary": "bg-blue-50 text-blue-700 border-blue-200",
+      "success": "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "warning": "bg-amber-50 text-amber-700 border-amber-200"
+    }
+  },
+  "page_specifics": {
+    "landing": {
+      "hero": "Left aligned text, Right side abstract 3D/Illustration. Background subtle gradient slate-50 to white.",
+      "features": "Bento grid layout. Cards with icons on top-left.",
+      "pricing": "3 cards. Center card (Pro/Popular) scale-105 border-orange-500 shadow-xl relative z-10."
+    },
+    "checkout": {
+      "layout": "Two-column layout (Desktop).",
+      "left_column": "Sticky. Darker background (Slate-900 or Navy). Contains Order Summary and Testimonials carousel.",
+      "right_column": "White background. Multi-step form (Wizard). Clean, focus on inputs.",
+      "steps": ["Data Pemesan", "Pembayaran"],
+      "testimonials": "Show avatar, name, school, and quote. Auto-sliding or manual arrows."
+    },
+    "dashboard": {
+      "layout": "Sidebar navigation (Navy). Main content area (Light Slate).",
+      "stats": "Top row cards: Token Balance, Total Generated, Plan Status.",
+      "history_table": "Clean rows, status badges, action buttons (Download/Edit) on right."
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_illustration": "https://images.unsplash.com/photo-1690861835418-64b46dd72d7b?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "teacher_using_laptop": "https://images.unsplash.com/photo-1667430806405-70ef5bc4970f?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "classroom_interaction": "https://images.unsplash.com/photo-1764720573370-5008f1ccc9fa?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "happy_teacher": "https://images.unsplash.com/photo-1762994577543-1aa11f21310c?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "testimonials": [
+        "https://randomuser.me/api/portraits/women/44.jpg",
+        "https://randomuser.me/api/portraits/men/32.jpg",
+        "https://randomuser.me/api/portraits/women/68.jpg"
+      ]
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px, size 20px for UI, 24px for Nav."
+    }
+  },
+  "animations": {
+    "micro": "Hover lift (-2px), Active scale (0.98), Focus ring (2px).",
+    "page_transition": "Fade in (opacity 0 to 1) duration-300 ease-out.",
+    "list_stagger": "Stagger children 0.05s slide-up."
+  },
+  "accessibility": {
+    "contrast": "Ensure Navy text on white is legible. Avoid light grey text on white.",
+    "focus": "Visible focus rings on all interactive elements.",
+    "labels": "All inputs must have visible labels or aria-labels."
+  },
+  "universal_guidelines": [
+    "Do NOT use gradients for main backgrounds. Keep it clean.",
+    "Use 'sonner' for toast notifications.",
+    "Use 'lucide-react' for icons.",
+    "Ensure mobile responsiveness for all tables (use scroll-x or card view on mobile).",
+    "For the Checkout page, strictly follow the 'SantaiScale' reference: Left Testimonials, Right Form."
+  ],
+  "instructions_to_main_agent": [
+    "1. Setup Shadcn components with the custom colors defined above.",
+    "2. Create the Checkout page first as it is a critical requirement.",
+    "3. Ensure the 'Token System' logic is visible in the UI (Show cost per document).",
+    "4. Use the provided image URLs for the landing page and dashboard placeholders."
+  ]
+}
