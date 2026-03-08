@@ -1,53 +1,81 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+// Pages
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import Dashboard from "./pages/Dashboard";
+import Generate from "./pages/Generate";
+import History from "./pages/History";
+import HistoryDetail from "./pages/HistoryDetail";
+import Checkout from "./pages/Checkout";
+import SuperAdmin from "./pages/SuperAdmin";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
+// Protected Route Component
+const ProtectedRoute = ({ children, adminOnly = false }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E3A5F]"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (adminOnly && user.role !== "super_admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
 };
 
 function App() {
   return (
-    <div className="App">
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
+          {/* Public Routes */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          
+          {/* Protected Routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute><Dashboard /></ProtectedRoute>
+          } />
+          <Route path="/generate" element={
+            <ProtectedRoute><Generate /></ProtectedRoute>
+          } />
+          <Route path="/history" element={
+            <ProtectedRoute><History /></ProtectedRoute>
+          } />
+          <Route path="/history/:id" element={
+            <ProtectedRoute><HistoryDetail /></ProtectedRoute>
+          } />
+          <Route path="/checkout" element={
+            <ProtectedRoute><Checkout /></ProtectedRoute>
+          } />
+          <Route path="/checkout/:packageId" element={
+            <ProtectedRoute><Checkout /></ProtectedRoute>
+          } />
+          
+          {/* Admin Routes */}
+          <Route path="/super-admin/*" element={
+            <ProtectedRoute adminOnly><SuperAdmin /></ProtectedRoute>
+          } />
         </Routes>
       </BrowserRouter>
-    </div>
+      <Toaster position="top-right" richColors />
+    </AuthProvider>
   );
 }
 
