@@ -5,7 +5,7 @@
 
 ## Tech Stack
 - **Frontend**: React + Tailwind CSS + Shadcn UI
-- **Backend**: FastAPI (Python) + MongoDB
+- **Backend**: FastAPI (Python) + MongoDB (modular architecture)
 - **AI**: Google Gemini API (2.5-flash / 2.5-pro)
 - **Payment**: Midtrans (Sandbox)
 - **Email**: Mailketing (MOCKED)
@@ -34,6 +34,9 @@
 - [x] Physics custom values: Resistor, Voltage untuk soal Fisika
 - [x] SVG Diagrams: CircuitDiagram, MeterDiagram, PhysicsDiagram
 - [x] Export Excel dengan styling header #1E3A5F
+- [x] Multi-document generation (generate beberapa dokumen sekaligus)
+- [x] Format soal baru: semua soal dulu, kunci jawaban & pembahasan di akhir
+- [x] Daftar Pustaka di Modul Ajar dengan sumber resmi pemerintah
 
 ### Payment Integration
 - [x] Midtrans Snap.js popup
@@ -44,29 +47,24 @@
 - [x] Dashboard: total users, revenue, documents, token circulation
 - [x] User management: edit token balance, suspend/activate
 - [x] Transaction monitoring dengan filter status
-- [x] Voucher management: create, list
-- [x] AI Settings: switch provider (Flash-Lite/Pro), update API key
+- [x] Voucher management: create, list, toggle active/inactive, delete
+- [x] AI Settings: switch provider (Flash/Pro), update API key
 
-## What's Been Implemented (Jan 2026)
-
-### Backend
-- FastAPI server with JWT auth
-- MongoDB collections: users, transactions, generations, vouchers, settings
-- Gemini AI integration with configurable provider
-- Midtrans payment integration
-- Webhook handler for payment notifications
-- Admin endpoints for dashboard, users, transactions, vouchers, AI settings
-
-### Frontend
-- Landing page with hero, features, pricing, testimonials
-- Auth pages: Login, Register, Forgot Password
-- Dashboard with token balance, recent generations, quick actions
-- Generate page: 3-step wizard with form, config, result
-- Checkout page: 2-step wizard like SantaiScale reference
-- History page with search/filter
-- Super Admin panel with Dashboard, Users, Transactions, Vouchers, AI Settings
-- SVG diagram components for physics (CircuitDiagram, MeterDiagram, PhysicsDiagram)
-- Excel export utility with styling
+## Backend Architecture (Refactored Mar 2026)
+```
+/app/backend/
+├── server.py          (slim app entry, startup, CORS)
+├── database.py        (MongoDB connection)
+├── config.py          (config constants, TOKEN_PACKAGES)
+├── models.py          (all Pydantic models)
+├── auth.py            (JWT helpers, auth dependencies)
+├── prompts.py         (AI prompt building functions)
+├── routes/
+│   ├── auth_routes.py     (auth endpoints)
+│   ├── generate_routes.py (document generation + packages)
+│   ├── payment_routes.py  (payment + voucher apply + transactions)
+│   └── admin_routes.py    (admin panel endpoints)
+```
 
 ## API Credentials
 - **Super Admin**: ipankpaul107@gmail.com / Kakiku5.
@@ -76,20 +74,21 @@
 
 ## Next Tasks / Backlog
 
-### P0 (Critical)
-- [ ] Real email integration (Mailketing)
-- [ ] Production Midtrans keys
-
 ### P1 (Important)
-- [ ] Word/PDF export
-- [ ] More physics diagram types (lens, waves, thermodynamics)
-- [ ] KaTeX rendering for math formulas
+- [ ] Word export yang lebih baik (sudah dibahas user)
+- [ ] Diagram untuk mata pelajaran lain (Chart.js untuk Matematika, gambar stock untuk Biologi/Kimia)
+- [ ] Ubah label "Token" menjadi "Generate" di UI
 
 ### P2 (Nice to have)
+- [ ] User upload gambar untuk soal
+- [ ] KaTeX rendering untuk rumus matematika
 - [ ] User profile settings page
 - [ ] Password change functionality
+
+### P3 (Future)
+- [ ] Real email integration (Mailketing)
+- [ ] Production Midtrans keys
 - [ ] Analytics dashboard with charts
-- [ ] Bulk document generation
 
 ## Design Guidelines
 - Primary: #1E3A5F (Navy)
