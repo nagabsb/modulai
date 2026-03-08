@@ -143,39 +143,46 @@ const Generate = () => {
     
     try {
       if (isMultiMode && selectedDocTypes.length > 1) {
-        // Multi-document generation
-        setGeneratingProgress(`Generating 0/${selectedDocTypes.length}...`);
-        
-        const requestData = {
-          doc_types: selectedDocTypes,
-          jenjang: formData.jenjang,
-          kelas: formData.kelas,
-          kurikulum: formData.kurikulum,
-          semester: formData.semester,
-          fase: formData.fase,
-          mata_pelajaran: formData.mata_pelajaran,
-          topik: formData.topik,
-          alokasi_waktu: formData.alokasi_waktu,
-          tingkat_kesulitan: formData.tingkat_kesulitan,
-          jumlah_pg: formData.jumlah_pg,
-          jumlah_isian: formData.jumlah_isian,
-          jumlah_essay: formData.jumlah_essay,
-          sertakan_pembahasan: formData.sertakan_pembahasan,
-          use_custom_values: formData.use_custom_values,
-          resistor1: formData.use_custom_values && formData.resistor1 ? parseFloat(formData.resistor1) : null,
-          resistor2: formData.use_custom_values && formData.resistor2 ? parseFloat(formData.resistor2) : null,
-          voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
-        };
-        
-        const response = await api.post("/generate/multi", requestData);
-        setMultiResults(response.data);
-        setActiveTab(response.data.results[0]?.doc_type || "");
+        // Multi-document: generate one at a time from frontend to avoid timeout
+        const results = [];
+        let totalTokensUsed = 0;
+        let remainingTokens = user.token_balance;
+
+        for (let i = 0; i < selectedDocTypes.length; i++) {
+          const docType = selectedDocTypes[i];
+          setGeneratingProgress(`Membuat ${DOC_TYPE_LABELS[docType]} (${i + 1}/${selectedDocTypes.length})...`);
+
+          const requestData = {
+            ...formData,
+            doc_type: docType,
+            resistor1: formData.use_custom_values && formData.resistor1 ? parseFloat(formData.resistor1) : null,
+            resistor2: formData.use_custom_values && formData.resistor2 ? parseFloat(formData.resistor2) : null,
+            voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
+          };
+
+          const response = await api.post("/generate", requestData, { timeout: 180000 });
+          results.push({
+            id: response.data.id,
+            doc_type: docType,
+            result_html: response.data.result_html
+          });
+          totalTokensUsed += response.data.tokens_used;
+          remainingTokens = response.data.remaining_tokens;
+        }
+
+        setMultiResults({
+          results,
+          tokens_used: totalTokensUsed,
+          remaining_tokens: remainingTokens
+        });
+        setActiveTab(results[0]?.doc_type || "");
         await refreshUser();
         setStep(3);
         toast.success(`${selectedDocTypes.length} dokumen berhasil dibuat!`);
       } else {
         // Single document generation
         const docType = isMultiMode ? selectedDocTypes[0] : formData.doc_type;
+        setGeneratingProgress(`Membuat ${DOC_TYPE_LABELS[docType]}...`);
         const requestData = {
           ...formData,
           doc_type: docType,
@@ -184,14 +191,18 @@ const Generate = () => {
           voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
         };
         
-        const response = await api.post("/generate", requestData);
+        const response = await api.post("/generate", requestData, { timeout: 180000 });
         setResult(response.data);
         await refreshUser();
         setStep(3);
         toast.success("Dokumen berhasil dibuat!");
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Gagal generate dokumen");
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error("Proses terlalu lama. Cek di menu Riwayat, dokumen mungkin sudah tersimpan.");
+      } else {
+        toast.error(error.response?.data?.detail || "Gagal generate dokumen. Coba lagi.");
+      }
     } finally {
       setLoading(false);
       setGeneratingProgress("");
@@ -774,13 +785,14 @@ const Generate = () => {
               <Card>
                 <CardContent className="p-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <div className="border-b px-4">
-                      <TabsList className="bg-transparent h-auto p-0 gap-0">
+                    <div className="border-b px-2 overflow-x-auto">
+                      <TabsList className="bg-transparent h-auto p-0 gap-0 w-full justify-start">
                         {multiResults.results.map((r) => (
                           <TabsTrigger 
                             key={r.doc_type} 
                             value={r.doc_type}
-                            className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A5F] data-[state=active]:bg-transparent"
+                            className="px-5 py-3 rounded-none border-b-2 border-transparent font-semibold uppercase text-xs tracking-wide data-[state=active]:border-[#F4820A] data-[state=active]:text-[#F4820A] data-[state=active]:bg-transparent whitespace-nowrap"
+                            data-testid={`tab-${r.doc_type}`}
                           >
                             {DOC_TYPE_LABELS[r.doc_type]}
                           </TabsTrigger>

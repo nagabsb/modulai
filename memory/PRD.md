@@ -34,11 +34,12 @@
 - [x] Physics custom values: Resistor, Voltage untuk soal Fisika
 - [x] SVG Diagrams: CircuitDiagram, MeterDiagram, PhysicsDiagram
 - [x] Export Excel dengan styling header #1E3A5F
-- [x] Multi-document generation (generate beberapa dokumen sekaligus)
+- [x] Multi-document generation (generate satu per satu dari frontend, menghindari timeout)
 - [x] Format soal baru: semua soal dulu, kunci jawaban & pembahasan di akhir
 - [x] Daftar Pustaka di Modul Ajar dengan sumber resmi pemerintah
 - [x] LaTeX/KaTeX rendering untuk rumus matematika & fisika
 - [x] HTML terstruktur untuk output soal (proper spacing, indentation, section headers)
+- [x] Tabbed view untuk multi-doc results
 
 ### Payment Integration
 - [x] Midtrans Snap.js popup
@@ -77,12 +78,14 @@
 ## Next Tasks / Backlog
 
 ### P1 (Important)
+- [ ] Multi-provider AI system (Gemini + OpenAI + Claude, fallback strategy, admin UI)
 - [ ] Word export yang lebih baik (sudah dibahas user)
 - [ ] Diagram untuk mata pelajaran lain (Chart.js untuk Matematika, gambar stock untuk Biologi/Kimia)
 - [ ] Ubah label "Token" menjadi "Generate" di UI
 
 ### P2 (Nice to have)
 - [ ] User upload gambar untuk soal
+- [ ] Rate limiting per user
 - [ ] User profile settings page
 - [ ] Password change functionality
 
@@ -90,6 +93,7 @@
 - [ ] Real email integration (Mailketing)
 - [ ] Production Midtrans keys
 - [ ] Analytics dashboard with charts
+- [ ] Caching hasil generate untuk topik serupa
 
 ## Design Guidelines
 - Primary: #1E3A5F (Navy)
