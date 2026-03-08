@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import api from "../utils/api";
 import { exportToExcel, exportMultipleToExcel } from "../utils/exportExcel";
 import { parseDiagramsInContent, hasDiagrams } from "../utils/diagramParser";
+import { processGeneratedContent } from "../utils/latexRenderer";
 import { 
   JENJANG_OPTIONS, 
   KELAS_OPTIONS, 
@@ -252,10 +253,13 @@ const Generate = () => {
   const renderResultContent = (html) => {
     if (!html) return null;
     
-    if (hasDiagrams(html)) {
+    // Process LaTeX and fix formatting
+    const processedHtml = processGeneratedContent(html);
+    
+    if (hasDiagrams(processedHtml)) {
       return (
         <div className="document-result prose max-w-none">
-          {parseDiagramsInContent(html)}
+          {parseDiagramsInContent(processedHtml)}
         </div>
       );
     }
@@ -263,7 +267,7 @@ const Generate = () => {
     return (
       <div 
         className="document-result prose max-w-none"
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: processedHtml }}
       />
     );
   };

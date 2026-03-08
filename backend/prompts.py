@@ -135,13 +135,13 @@ Buat dengan desain menarik, ada kotak isian untuk jawaban siswa (gunakan <u>&nbs
         }
 
         pembahasan_instruction = """
-
-PEMBAHASAN
-
-(Untuk setiap soal, berikan penjelasan detail dengan rumus dan langkah penyelesaian)
-1. [Pembahasan lengkap soal 1]
-2. [Pembahasan lengkap soal 2]
-... dst""" if data.sertakan_pembahasan else ""
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">PEMBAHASAN</h2>
+<p><em>(Untuk setiap soal, berikan penjelasan detail dengan rumus dan langkah penyelesaian)</em></p>
+<div style="margin-left:10px;">
+<p><strong>1.</strong> [Pembahasan lengkap soal 1]</p>
+<p><strong>2.</strong> [Pembahasan lengkap soal 2]</p>
+</div>
+... dst untuk semua soal""" if data.sertakan_pembahasan else ""
 
         return f"""Buatkan Bank Soal dengan spesifikasi:
 {base_info}
@@ -154,68 +154,106 @@ Jumlah Soal:
 - Isian Singkat: {data.jumlah_isian} soal
 - Essay/Uraian: {data.jumlah_essay} soal
 
-PENTING - FORMAT OUTPUT HARUS SEPERTI INI:
+SANGAT PENTING - OUTPUT HARUS BERUPA HTML YANG TERSTRUKTUR DENGAN BAIK.
+Gunakan tag HTML berikut secara WAJIB:
+- <h2> untuk judul section (dengan style background-color:#1E3A5F;color:white;padding:10px)
+- <div> untuk setiap soal (dengan margin-bottom:20px)
+- <p> untuk teks soal
+- <div> dengan margin-left untuk pilihan jawaban, SETIAP PILIHAN di baris terpisah menggunakan <p>
+- <strong> untuk nomor soal
+- <hr> untuk pemisah antar section
 
-BANK SOAL {data.mata_pelajaran.upper()}
-Kelas {data.kelas} {data.jenjang} | {data.kurikulum} | Semester {data.semester}
+Untuk rumus matematika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display.
+Contoh: $F = m \\times a$, $v = \\frac{{s}}{{t}}$, $E_k = \\frac{{1}}{{2}}mv^2$
 
-I. SOAL PILIHAN GANDA
+FORMAT HTML OUTPUT HARUS PERSIS SEPERTI INI:
 
-1. [Soal pertama dengan rumus LaTeX jika perlu]
-   A. [Pilihan jawaban]
-   B. [Pilihan jawaban]
-   C. [Pilihan jawaban]
-   D. [Pilihan jawaban]
-   E. [Pilihan jawaban]
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;text-align:center;">BANK SOAL {data.mata_pelajaran.upper()}</h2>
+<p style="text-align:center;"><strong>Kelas {data.kelas} {data.jenjang} | {data.kurikulum} | Semester {data.semester}</strong></p>
 
-2. [Soal kedua]
-   A. ...
-   B. ...
-   C. ...
-   D. ...
-   E. ...
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">I. SOAL PILIHAN GANDA</h2>
 
-(Lanjutkan sampai {data.jumlah_pg} soal PG selesai)
+<div style="margin-bottom:20px;">
+<p><strong>1.</strong> [Teks soal pertama lengkap]</p>
+<div style="margin-left:30px;">
+<p>A. [Pilihan jawaban A]</p>
+<p>B. [Pilihan jawaban B]</p>
+<p>C. [Pilihan jawaban C]</p>
+<p>D. [Pilihan jawaban D]</p>
+<p>E. [Pilihan jawaban E]</p>
+</div>
+</div>
 
-II. SOAL ISIAN SINGKAT
+<div style="margin-bottom:20px;">
+<p><strong>2.</strong> [Teks soal kedua lengkap]</p>
+<div style="margin-left:30px;">
+<p>A. ...</p>
+<p>B. ...</p>
+<p>C. ...</p>
+<p>D. ...</p>
+<p>E. ...</p>
+</div>
+</div>
 
-1. [Soal isian] _______________
-2. [Soal isian] _______________
+(Lanjutkan pola yang SAMA PERSIS untuk setiap soal sampai {data.jumlah_pg} soal PG selesai)
+
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">II. SOAL ISIAN SINGKAT</h2>
+
+<div style="margin-bottom:15px;">
+<p><strong>1.</strong> [Teks soal isian] _______________</p>
+</div>
+<div style="margin-bottom:15px;">
+<p><strong>2.</strong> [Teks soal isian] _______________</p>
+</div>
 (Lanjutkan sampai {data.jumlah_isian} soal isian selesai)
 
-III. SOAL ESSAY/URAIAN
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">III. SOAL ESSAY/URAIAN</h2>
 
-1. [Soal essay lengkap]
-2. [Soal essay lengkap]
+<div style="margin-bottom:20px;">
+<p><strong>1.</strong> [Teks soal essay lengkap]</p>
+</div>
+<div style="margin-bottom:20px;">
+<p><strong>2.</strong> [Teks soal essay lengkap]</p>
+</div>
 (Lanjutkan sampai {data.jumlah_essay} soal essay selesai)
 
-KUNCI JAWABAN
+<hr style="border:2px solid #1E3A5F;margin:30px 0;">
 
-I. Pilihan Ganda
-1. [Huruf]    6. [Huruf]    11. [Huruf]
-2. [Huruf]    7. [Huruf]    12. [Huruf]
-3. [Huruf]    8. [Huruf]    13. [Huruf]
-4. [Huruf]    9. [Huruf]    14. [Huruf]
-5. [Huruf]   10. [Huruf]    15. [Huruf]
-(Sesuaikan dengan jumlah soal)
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;">KUNCI JAWABAN</h2>
 
-II. Isian Singkat
-1. [Jawaban]
-2. [Jawaban]
-... dst
+<table style="width:100%;border-collapse:collapse;margin:15px 0;">
+<tr style="background-color:#1E3A5F;color:white;">
+<th style="padding:8px;border:1px solid #ccc;">No</th>
+<th style="padding:8px;border:1px solid #ccc;">PG</th>
+<th style="padding:8px;border:1px solid #ccc;">No</th>
+<th style="padding:8px;border:1px solid #ccc;">PG</th>
+</tr>
+<tr><td style="padding:8px;border:1px solid #ccc;">1</td><td style="padding:8px;border:1px solid #ccc;">[Huruf]</td><td style="padding:8px;border:1px solid #ccc;">6</td><td style="padding:8px;border:1px solid #ccc;">[Huruf]</td></tr>
+</table>
 
-III. Essay
-1. [Jawaban lengkap]
-2. [Jawaban lengkap]
-... dst
+<h3 style="margin-top:20px;"><strong>Isian Singkat:</strong></h3>
+<div style="margin-left:10px;">
+<p><strong>1.</strong> [Jawaban]</p>
+<p><strong>2.</strong> [Jawaban]</p>
+</div>
+
+<h3 style="margin-top:20px;"><strong>Essay:</strong></h3>
+<div style="margin-left:10px;">
+<p><strong>1.</strong> [Jawaban lengkap]</p>
+<p><strong>2.</strong> [Jawaban lengkap]</p>
+</div>
 {pembahasan_instruction}
 
 CATATAN PENTING:
+- OUTPUT WAJIB HTML! Gunakan tag <h2>, <p>, <div>, <table>, <strong> dll
 - SEMUA SOAL harus ditulis LENGKAP terlebih dahulu
 - KUNCI JAWABAN ditulis SETELAH semua soal selesai
 - PEMBAHASAN (jika ada) ditulis PALING AKHIR setelah kunci jawaban
-- Untuk Matematika/Fisika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display
-- Format output: HTML dengan pemisah yang jelas. JANGAN gunakan emoji."""
+- Setiap pilihan jawaban (A, B, C, D, E) HARUS pada baris terpisah (gunakan <p> tag)
+- Setiap soal HARUS dipisahkan dengan spacing yang cukup (gunakan <div> dengan margin-bottom)
+- Untuk rumus Matematika/Fisika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display
+- JANGAN gunakan emoji
+- JANGAN output sebagai plain text, HARUS HTML terstruktur"""
 
     elif data.doc_type == "rubrik":
         return f"""Buatkan Rubrik Asesmen dengan format:

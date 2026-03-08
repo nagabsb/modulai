@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import api from "../utils/api";
 import { exportToExcel } from "../utils/exportExcel";
 import { parseDiagramsInContent, hasDiagrams } from "../utils/diagramParser";
+import { processGeneratedContent } from "../utils/latexRenderer";
 import { DOC_TYPE_LABELS, formatDate } from "../utils/constants";
 import { 
   ArrowLeft, 
@@ -74,17 +75,18 @@ const HistoryDetail = () => {
   };
 
   const renderContent = () => {
-    if (hasDiagrams(generation.result_html)) {
+    const processedHtml = processGeneratedContent(generation.result_html);
+    if (hasDiagrams(processedHtml)) {
       return (
         <div className="document-result prose max-w-none">
-          {parseDiagramsInContent(generation.result_html)}
+          {parseDiagramsInContent(processedHtml)}
         </div>
       );
     }
     return (
       <div 
         className="document-result prose max-w-none"
-        dangerouslySetInnerHTML={{ __html: generation.result_html }}
+        dangerouslySetInnerHTML={{ __html: processedHtml }}
       />
     );
   };

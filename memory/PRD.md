@@ -4,7 +4,7 @@
 **ModulAI** adalah Generator Perangkat Ajar AI untuk Guru Indonesia dengan sistem token, pembayaran, dan admin panel.
 
 ## Tech Stack
-- **Frontend**: React + Tailwind CSS + Shadcn UI
+- **Frontend**: React + Tailwind CSS + Shadcn UI + KaTeX (math rendering)
 - **Backend**: FastAPI (Python) + MongoDB (modular architecture)
 - **AI**: Google Gemini API (2.5-flash / 2.5-pro)
 - **Payment**: Midtrans (Sandbox)
@@ -37,6 +37,8 @@
 - [x] Multi-document generation (generate beberapa dokumen sekaligus)
 - [x] Format soal baru: semua soal dulu, kunci jawaban & pembahasan di akhir
 - [x] Daftar Pustaka di Modul Ajar dengan sumber resmi pemerintah
+- [x] LaTeX/KaTeX rendering untuk rumus matematika & fisika
+- [x] HTML terstruktur untuk output soal (proper spacing, indentation, section headers)
 
 ### Payment Integration
 - [x] Midtrans Snap.js popup
@@ -81,7 +83,6 @@
 
 ### P2 (Nice to have)
 - [ ] User upload gambar untuk soal
-- [ ] KaTeX rendering untuk rumus matematika
 - [ ] User profile settings page
 - [ ] Password change functionality
 
