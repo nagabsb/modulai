@@ -137,6 +137,29 @@ class AISettingsUpdate(BaseModel):
     provider: str  # gemini_flash_lite, gemini_pro
     gemini_api_key: Optional[str] = None
 
+class MultiGenerateRequest(BaseModel):
+    doc_types: List[str]  # ["modul", "rpp", "lkpd", "soal", "rubrik"]
+    jenjang: str
+    kelas: str
+    kurikulum: str
+    semester: str
+    fase: str
+    mata_pelajaran: str
+    topik: str
+    alokasi_waktu: int
+    tingkat_kesulitan: Optional[str] = "Sedang"
+    jumlah_pg: Optional[int] = 0
+    jumlah_isian: Optional[int] = 0
+    jumlah_essay: Optional[int] = 0
+    sertakan_pembahasan: Optional[bool] = True
+    use_custom_values: Optional[bool] = False
+    resistor1: Optional[float] = None
+    resistor2: Optional[float] = None
+    voltage: Optional[float] = None
+
+class VoucherUpdate(BaseModel):
+    is_active: Optional[bool] = None
+
 # ============== HELPERS ==============
 
 def hash_password(password: str) -> str:
@@ -324,7 +347,13 @@ Struktur Modul Ajar:
    - Lembar Kerja Peserta Didik
    - Bahan Bacaan
    - Glosarium
-   - Daftar Pustaka
+
+4. DAFTAR PUSTAKA
+   Wajib sertakan referensi resmi berikut (sesuaikan dengan mata pelajaran dan jenjang):
+   - Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi. (2024). Panduan Pembelajaran dan Asesmen Kurikulum Merdeka. Jakarta: Kemendikbudristek. Tersedia di: kurikulum.kemendikdasmen.go.id
+   - Badan Standar, Kurikulum, dan Asesmen Pendidikan. (2022). Capaian Pembelajaran {data.mata_pelajaran} Fase {data.fase}. Jakarta: BSKAP.
+   - Pusat Perbukuan. (2024). Buku Panduan Guru {data.mata_pelajaran} Kelas {data.kelas} {data.jenjang}. Jakarta: Kemendikdasmen. Tersedia di: buku.kemendikdasmen.go.id
+   - Tambahkan 2-3 sumber relevan lainnya (buku teks, jurnal pendidikan, atau sumber resmi pemerintah)
 
 Format output: HTML dengan tabel berformat (header #1E3A5F, teks putih). Gunakan LaTeX untuk rumus matematika ($formula$ untuk inline, $$formula$$ untuk block). JANGAN gunakan emoji."""
 
@@ -374,6 +403,17 @@ Buat dengan desain menarik, ada kotak isian untuk jawaban siswa (gunakan <u>&nbs
             "Campuran": "C1-C6 (bervariasi)"
         }
         
+        pembahasan_instruction = """
+
+════════════════════════════════════════════════════════════════
+
+PEMBAHASAN
+
+(Untuk setiap soal, berikan penjelasan detail dengan rumus dan langkah penyelesaian)
+1. [Pembahasan lengkap soal 1]
+2. [Pembahasan lengkap soal 2]
+... dst""" if data.sertakan_pembahasan else ""
+        
         return f"""Buatkan Bank Soal dengan spesifikasi:
 {base_info}
 Tingkat Kesulitan: {data.tingkat_kesulitan} - {difficulty_map.get(data.tingkat_kesulitan, '')}
@@ -385,31 +425,79 @@ Jumlah Soal:
 - Isian Singkat: {data.jumlah_isian} soal
 - Essay/Uraian: {data.jumlah_essay} soal
 
-Format Soal PG:
-1. [Tag DIAGRAM jika relevan]
-   [Soal dengan rumus LaTeX jika perlu]
-   A. [Pilihan]
-   B. [Pilihan]
-   C. [Pilihan]
-   D. [Pilihan]
-   E. [Pilihan]
-   
-   Kunci: [Huruf]
-   {"Pembahasan: [Penjelasan detail dengan rumus dan langkah penyelesaian]" if data.sertakan_pembahasan else ""}
+PENTING - FORMAT OUTPUT HARUS SEPERTI INI:
 
-Format Soal Isian:
-1. [Soal] _____
-   Jawaban: [Jawaban]
-   {"Pembahasan: [Penjelasan]" if data.sertakan_pembahasan else ""}
+════════════════════════════════════════════════════════════════
+BANK SOAL {data.mata_pelajaran.upper()}
+Kelas {data.kelas} {data.jenjang} | {data.kurikulum} | Semester {data.semester}
+════════════════════════════════════════════════════════════════
 
-Format Soal Essay:
-1. [Soal]
-   Jawaban: [Jawaban lengkap]
-   {"Pembahasan: [Penjelasan langkah demi langkah]" if data.sertakan_pembahasan else ""}
-   Rubrik Penilaian: [Skor maksimal dan kriteria]
+I. SOAL PILIHAN GANDA
 
-Untuk soal Matematika/Fisika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display.
-Format output: HTML dengan pemisah yang jelas antar soal. JANGAN gunakan emoji."""
+1. [Soal pertama dengan rumus LaTeX jika perlu]
+   A. [Pilihan jawaban]
+   B. [Pilihan jawaban]
+   C. [Pilihan jawaban]
+   D. [Pilihan jawaban]
+   E. [Pilihan jawaban]
+
+2. [Soal kedua]
+   A. ...
+   B. ...
+   C. ...
+   D. ...
+   E. ...
+
+(Lanjutkan sampai {data.jumlah_pg} soal PG selesai)
+
+════════════════════════════════════════════════════════════════
+
+II. SOAL ISIAN SINGKAT
+
+1. [Soal isian] _______________
+2. [Soal isian] _______________
+(Lanjutkan sampai {data.jumlah_isian} soal isian selesai)
+
+════════════════════════════════════════════════════════════════
+
+III. SOAL ESSAY/URAIAN
+
+1. [Soal essay lengkap]
+2. [Soal essay lengkap]
+(Lanjutkan sampai {data.jumlah_essay} soal essay selesai)
+
+════════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════
+
+KUNCI JAWABAN
+
+I. Pilihan Ganda
+1. [Huruf]    6. [Huruf]    11. [Huruf]
+2. [Huruf]    7. [Huruf]    12. [Huruf]
+3. [Huruf]    8. [Huruf]    13. [Huruf]
+4. [Huruf]    9. [Huruf]    14. [Huruf]
+5. [Huruf]   10. [Huruf]    15. [Huruf]
+(Sesuaikan dengan jumlah soal)
+
+II. Isian Singkat
+1. [Jawaban]
+2. [Jawaban]
+... dst
+
+III. Essay
+1. [Jawaban lengkap]
+2. [Jawaban lengkap]
+... dst
+{pembahasan_instruction}
+
+════════════════════════════════════════════════════════════════
+
+CATATAN PENTING:
+- SEMUA SOAL harus ditulis LENGKAP terlebih dahulu
+- KUNCI JAWABAN ditulis SETELAH semua soal selesai
+- PEMBAHASAN (jika ada) ditulis PALING AKHIR setelah kunci jawaban
+- Untuk Matematika/Fisika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display
+- Format output: HTML dengan pemisah yang jelas. JANGAN gunakan emoji."""
 
     elif data.doc_type == "rubrik":
         return f"""Buatkan Rubrik Asesmen dengan format:
@@ -942,6 +1030,103 @@ async def admin_create_voucher(admin: dict = Depends(get_admin_user), code: str 
 async def admin_get_vouchers(admin: dict = Depends(get_admin_user)):
     vouchers = await db.vouchers.find({}, {"_id": 0}).to_list(100)
     return vouchers
+
+@api_router.put("/admin/vouchers/{voucher_id}")
+async def admin_update_voucher(voucher_id: str, data: VoucherUpdate, admin: dict = Depends(get_admin_user)):
+    update_data = {}
+    if data.is_active is not None:
+        update_data["is_active"] = data.is_active
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Tidak ada data untuk diupdate")
+    
+    result = await db.vouchers.update_one({"id": voucher_id}, {"$set": update_data})
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Voucher tidak ditemukan")
+    
+    return {"message": "Voucher berhasil diupdate"}
+
+@api_router.delete("/admin/vouchers/{voucher_id}")
+async def admin_delete_voucher(voucher_id: str, admin: dict = Depends(get_admin_user)):
+    result = await db.vouchers.delete_one({"id": voucher_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Voucher tidak ditemukan")
+    
+    return {"message": "Voucher berhasil dihapus"}
+
+# ============== MULTI-DOCUMENT GENERATION ==============
+
+@api_router.post("/generate/multi")
+async def generate_multi_documents(data: MultiGenerateRequest, user: dict = Depends(get_current_user)):
+    # Check token balance
+    tokens_needed = len(data.doc_types)
+    if user["token_balance"] < tokens_needed:
+        raise HTTPException(status_code=402, detail=f"Token tidak mencukupi. Butuh {tokens_needed} token, saldo Anda {user['token_balance']} token.")
+    
+    results = []
+    
+    # Generate each document type in the order selected by user
+    for doc_type in data.doc_types:
+        # Create single generate request
+        single_request = GenerateRequest(
+            doc_type=doc_type,
+            jenjang=data.jenjang,
+            kelas=data.kelas,
+            kurikulum=data.kurikulum,
+            semester=data.semester,
+            fase=data.fase,
+            mata_pelajaran=data.mata_pelajaran,
+            topik=data.topik,
+            alokasi_waktu=data.alokasi_waktu,
+            tingkat_kesulitan=data.tingkat_kesulitan,
+            jumlah_pg=data.jumlah_pg,
+            jumlah_isian=data.jumlah_isian,
+            jumlah_essay=data.jumlah_essay,
+            sertakan_pembahasan=data.sertakan_pembahasan,
+            use_custom_values=data.use_custom_values,
+            resistor1=data.resistor1,
+            resistor2=data.resistor2,
+            voltage=data.voltage
+        )
+        
+        # Build and send prompt
+        prompt = build_prompt(single_request)
+        result_html = await generate_with_gemini(prompt)
+        
+        # Clean up result
+        result_html = re.sub(r'^```html?\n?', '', result_html)
+        result_html = re.sub(r'\n?```$', '', result_html)
+        
+        # Save generation record
+        generation_id = str(uuid.uuid4())
+        generation = {
+            "id": generation_id,
+            "user_id": user["id"],
+            "doc_type": doc_type,
+            "form_data": single_request.model_dump(),
+            "result_html": result_html,
+            "tokens_used": 1,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.generations.insert_one(generation)
+        
+        results.append({
+            "id": generation_id,
+            "doc_type": doc_type,
+            "result_html": result_html
+        })
+    
+    # Deduct tokens
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$inc": {"token_balance": -tokens_needed}}
+    )
+    
+    return {
+        "results": results,
+        "tokens_used": tokens_needed,
+        "remaining_tokens": user["token_balance"] - tokens_needed
+    }
 
 # ============== HEALTH CHECK ==============
 

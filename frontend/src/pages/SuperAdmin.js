@@ -47,7 +47,8 @@ import {
   Gift,
   Bot,
   Key,
-  Zap
+  Zap,
+  Trash2
 } from "lucide-react";
 
 // Admin Dashboard Component
@@ -388,6 +389,7 @@ const AdminVouchers = () => {
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [newVoucher, setNewVoucher] = useState({
     code: "",
     discount_type: "percentage",
@@ -427,6 +429,32 @@ const AdminVouchers = () => {
     }
   };
 
+  const toggleVoucherStatus = async (voucherId, currentStatus) => {
+    try {
+      await api.put(`/admin/vouchers/${voucherId}`, { is_active: !currentStatus });
+      toast.success(`Voucher ${!currentStatus ? 'diaktifkan' : 'dinonaktifkan'}`);
+      fetchVouchers();
+    } catch (error) {
+      toast.error("Gagal mengubah status voucher");
+    }
+  };
+
+  const deleteVoucher = async (voucherId) => {
+    if (!window.confirm("Yakin ingin menghapus voucher ini? Tindakan ini tidak dapat dibatalkan.")) {
+      return;
+    }
+    setDeletingId(voucherId);
+    try {
+      await api.delete(`/admin/vouchers/${voucherId}`);
+      toast.success("Voucher berhasil dihapus");
+      fetchVouchers();
+    } catch (error) {
+      toast.error("Gagal menghapus voucher");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center">Memuat...</div>;
 
   return (
@@ -439,7 +467,7 @@ const AdminVouchers = () => {
           <CardTitle>Buat Voucher Baru</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 items-end">
+          <div className="flex gap-4 items-end flex-wrap">
             <div className="space-y-2">
               <Label>Kode Voucher</Label>
               <Input
@@ -472,8 +500,8 @@ const AdminVouchers = () => {
                 className="w-24"
               />
             </div>
-            <Button onClick={createVoucher} disabled={creating}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Buat"}
+            <Button onClick={createVoucher} disabled={creating} className="bg-[#1E3A5F] hover:bg-[#162B47]">
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Buat Voucher"}
             </Button>
           </div>
         </CardContent>
@@ -490,6 +518,7 @@ const AdminVouchers = () => {
                 <TableHead>Nilai</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Dibuat</TableHead>
+                <TableHead>Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -501,11 +530,27 @@ const AdminVouchers = () => {
                     {v.discount_type === "percentage" ? `${v.discount_value}%` : formatRupiah(v.discount_value)}
                   </TableCell>
                   <TableCell>
-                    <Badge className={v.is_active ? "bg-green-100 text-green-700" : "bg-slate-100"}>
-                      {v.is_active ? "Aktif" : "Nonaktif"}
-                    </Badge>
+                    <Switch
+                      checked={v.is_active}
+                      onCheckedChange={() => toggleVoucherStatus(v.id, v.is_active)}
+                    />
                   </TableCell>
                   <TableCell>{formatShortDate(v.created_at)}</TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => deleteVoucher(v.id)}
+                      disabled={deletingId === v.id}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {deletingId === v.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

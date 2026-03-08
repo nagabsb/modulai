@@ -2,7 +2,7 @@ import requests
 import json
 
 # Test login and document generation
-base_url = "https://guru-modul-gen.preview.emergentagent.com"
+base_url = "https://teach-ai-hub-2.preview.emergentagent.com"
 
 # Login as super admin
 login_response = requests.post(

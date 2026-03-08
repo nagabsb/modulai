@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Checkbox } from "../components/ui/checkbox";
 import { Badge } from "../components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { toast } from "sonner";
 import api from "../utils/api";
-import { exportToExcel } from "../utils/exportExcel";
+import { exportToExcel, exportMultipleToExcel } from "../utils/exportExcel";
 import { parseDiagramsInContent, hasDiagrams } from "../utils/diagramParser";
 import { 
   JENJANG_OPTIONS, 
@@ -36,7 +37,8 @@ import {
   PenTool,
   Award,
   FileSpreadsheet,
-  Zap
+  Zap,
+  Layers
 } from "lucide-react";
 
 import "katex/dist/katex.min.css";
@@ -48,6 +50,13 @@ const Generate = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [multiResults, setMultiResults] = useState(null);
+  const [activeTab, setActiveTab] = useState("");
+  const [generatingProgress, setGeneratingProgress] = useState("");
+  
+  // Multi-select mode
+  const [isMultiMode, setIsMultiMode] = useState(false);
+  const [selectedDocTypes, setSelectedDocTypes] = useState([]);
   
   const [formData, setFormData] = useState({
     doc_type: searchParams.get("type") || "modul",
@@ -64,19 +73,13 @@ const Generate = () => {
     jumlah_isian: 5,
     jumlah_essay: 3,
     sertakan_pembahasan: true,
-    // Custom physics values
     use_custom_values: false,
     resistor1: "",
     resistor2: "",
     voltage: ""
   });
 
-  // Check if physics subject for showing custom fields
   const isPhysicsSubject = ["Fisika", "IPA"].includes(formData.mata_pelajaran);
-  const isPhysicsTopic = isPhysicsSubject && formData.doc_type === "soal" && 
-    (formData.topik.toLowerCase().includes("listrik") || 
-     formData.topik.toLowerCase().includes("rangkaian") ||
-     formData.topik.toLowerCase().includes("hukum ohm"));
 
   useEffect(() => {
     const newFase = getFase(formData.jenjang, formData.kelas);
@@ -98,46 +101,109 @@ const Generate = () => {
     { type: "rubrik", label: "Rubrik Asesmen", icon: <Award className="w-5 h-5" />, desc: "Rubrik penilaian terstruktur" },
   ];
 
+  const toggleDocType = (type) => {
+    if (isMultiMode) {
+      setSelectedDocTypes(prev => 
+        prev.includes(type) 
+          ? prev.filter(t => t !== type)
+          : [...prev, type]
+      );
+    } else {
+      setFormData({ ...formData, doc_type: type });
+    }
+  };
+
+  const getTokenCost = () => {
+    if (isMultiMode) {
+      return selectedDocTypes.length;
+    }
+    return 1;
+  };
+
   const handleGenerate = async () => {
     if (!formData.topik.trim()) {
       toast.error("Mohon isi topik/materi pembelajaran");
       return;
     }
 
-    if (user.token_balance < 1) {
-      toast.error("Token tidak mencukupi. Silakan top up.");
+    const tokenCost = getTokenCost();
+    if (user.token_balance < tokenCost) {
+      toast.error(`Token tidak mencukupi. Butuh ${tokenCost} token.`);
       navigate("/checkout");
       return;
     }
 
+    if (isMultiMode && selectedDocTypes.length === 0) {
+      toast.error("Pilih minimal 1 jenis dokumen");
+      return;
+    }
+
     setLoading(true);
+    
     try {
-      const requestData = {
-        ...formData,
-        resistor1: formData.use_custom_values && formData.resistor1 ? parseFloat(formData.resistor1) : null,
-        resistor2: formData.use_custom_values && formData.resistor2 ? parseFloat(formData.resistor2) : null,
-        voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
-      };
-      
-      const response = await api.post("/generate", requestData);
-      setResult(response.data);
-      await refreshUser();
-      setStep(3);
-      toast.success("Dokumen berhasil dibuat!");
+      if (isMultiMode && selectedDocTypes.length > 1) {
+        // Multi-document generation
+        setGeneratingProgress(`Generating 0/${selectedDocTypes.length}...`);
+        
+        const requestData = {
+          doc_types: selectedDocTypes,
+          jenjang: formData.jenjang,
+          kelas: formData.kelas,
+          kurikulum: formData.kurikulum,
+          semester: formData.semester,
+          fase: formData.fase,
+          mata_pelajaran: formData.mata_pelajaran,
+          topik: formData.topik,
+          alokasi_waktu: formData.alokasi_waktu,
+          tingkat_kesulitan: formData.tingkat_kesulitan,
+          jumlah_pg: formData.jumlah_pg,
+          jumlah_isian: formData.jumlah_isian,
+          jumlah_essay: formData.jumlah_essay,
+          sertakan_pembahasan: formData.sertakan_pembahasan,
+          use_custom_values: formData.use_custom_values,
+          resistor1: formData.use_custom_values && formData.resistor1 ? parseFloat(formData.resistor1) : null,
+          resistor2: formData.use_custom_values && formData.resistor2 ? parseFloat(formData.resistor2) : null,
+          voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
+        };
+        
+        const response = await api.post("/generate/multi", requestData);
+        setMultiResults(response.data);
+        setActiveTab(response.data.results[0]?.doc_type || "");
+        await refreshUser();
+        setStep(3);
+        toast.success(`${selectedDocTypes.length} dokumen berhasil dibuat!`);
+      } else {
+        // Single document generation
+        const docType = isMultiMode ? selectedDocTypes[0] : formData.doc_type;
+        const requestData = {
+          ...formData,
+          doc_type: docType,
+          resistor1: formData.use_custom_values && formData.resistor1 ? parseFloat(formData.resistor1) : null,
+          resistor2: formData.use_custom_values && formData.resistor2 ? parseFloat(formData.resistor2) : null,
+          voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
+        };
+        
+        const response = await api.post("/generate", requestData);
+        setResult(response.data);
+        await refreshUser();
+        setStep(3);
+        toast.success("Dokumen berhasil dibuat!");
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || "Gagal generate dokumen");
     } finally {
       setLoading(false);
+      setGeneratingProgress("");
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = (html, docType, topik) => {
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${DOC_TYPE_LABELS[formData.doc_type]} - ${formData.topik}</title>
+        <title>${DOC_TYPE_LABELS[docType]} - ${topik}</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
         <style>
           body { font-family: 'Times New Roman', serif; line-height: 1.6; padding: 40px; }
@@ -148,17 +214,17 @@ const Generate = () => {
           @media print { body { padding: 0; } }
         </style>
       </head>
-      <body>${result.result_html.replace(/\[DIAGRAM:[^\]]+\]/g, '[Lihat Diagram di Aplikasi]')}</body>
+      <body>${html.replace(/\[DIAGRAM:[^\]]+\]/g, '[Lihat Diagram di Aplikasi]')}</body>
       </html>
     `);
     printWindow.document.close();
     printWindow.print();
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = (html, docType) => {
     try {
-      const filename = `${DOC_TYPE_LABELS[formData.doc_type]}_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
-      exportToExcel(result.result_html, filename, formData.doc_type);
+      const filename = `${DOC_TYPE_LABELS[docType]}_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
+      exportToExcel(html, filename, docType);
       toast.success("File Excel berhasil didownload!");
     } catch (error) {
       toast.error("Gagal export ke Excel");
@@ -166,14 +232,30 @@ const Generate = () => {
     }
   };
 
-  // Render content with diagrams
-  const renderResultContent = () => {
-    if (!result) return null;
+  const handleExportAllExcel = () => {
+    if (!multiResults) return;
+    try {
+      const documents = multiResults.results.map(r => ({
+        html: r.result_html,
+        name: DOC_TYPE_LABELS[r.doc_type],
+        type: r.doc_type
+      }));
+      const filename = `Paket_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
+      exportMultipleToExcel(documents, filename);
+      toast.success("File Excel berhasil didownload!");
+    } catch (error) {
+      toast.error("Gagal export ke Excel");
+      console.error(error);
+    }
+  };
+
+  const renderResultContent = (html) => {
+    if (!html) return null;
     
-    if (hasDiagrams(result.result_html)) {
+    if (hasDiagrams(html)) {
       return (
         <div className="document-result prose max-w-none">
-          {parseDiagramsInContent(result.result_html)}
+          {parseDiagramsInContent(html)}
         </div>
       );
     }
@@ -181,7 +263,7 @@ const Generate = () => {
     return (
       <div 
         className="document-result prose max-w-none"
-        dangerouslySetInnerHTML={{ __html: result.result_html }}
+        dangerouslySetInnerHTML={{ __html: html }}
       />
     );
   };
@@ -242,30 +324,65 @@ const Generate = () => {
               <CardTitle>Identitas Pembelajaran</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Multi-mode toggle */}
+              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                <Checkbox
+                  id="multiMode"
+                  checked={isMultiMode}
+                  onCheckedChange={(checked) => {
+                    setIsMultiMode(checked);
+                    if (!checked) setSelectedDocTypes([]);
+                  }}
+                  data-testid="checkbox-multi-mode"
+                />
+                <Label htmlFor="multiMode" className="cursor-pointer flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  <span className="font-medium text-blue-800">Generate Beberapa Dokumen Sekaligus</span>
+                </Label>
+              </div>
+
               {/* Doc Type Selection */}
               <div>
-                <Label className="mb-3 block">Jenis Dokumen</Label>
+                <Label className="mb-3 block">
+                  {isMultiMode ? "Pilih Dokumen (bisa lebih dari 1)" : "Jenis Dokumen"}
+                </Label>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {docTypes.map((doc) => (
-                    <div
-                      key={doc.type}
-                      onClick={() => setFormData({ ...formData, doc_type: doc.type })}
-                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
-                        formData.doc_type === doc.type
-                          ? 'border-[#1E3A5F] bg-[#1E3A5F]/5'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                      data-testid={`doc-type-${doc.type}`}
-                    >
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
-                        formData.doc_type === doc.type ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {doc.icon}
+                  {docTypes.map((doc) => {
+                    const isSelected = isMultiMode 
+                      ? selectedDocTypes.includes(doc.type)
+                      : formData.doc_type === doc.type;
+                    
+                    return (
+                      <div
+                        key={doc.type}
+                        onClick={() => toggleDocType(doc.type)}
+                        className={`cursor-pointer p-4 rounded-xl border-2 transition-all relative ${
+                          isSelected
+                            ? 'border-[#1E3A5F] bg-[#1E3A5F]/5'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                        data-testid={`doc-type-${doc.type}`}
+                      >
+                        {isMultiMode && isSelected && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-[#1E3A5F] rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
+                          isSelected ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {doc.icon}
+                        </div>
+                        <p className="font-medium text-sm">{doc.label}</p>
                       </div>
-                      <p className="font-medium text-sm">{doc.label}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+                {isMultiMode && selectedDocTypes.length > 0 && (
+                  <p className="mt-2 text-sm text-slate-500">
+                    {selectedDocTypes.length} dokumen dipilih = {selectedDocTypes.length} token
+                  </p>
+                )}
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -369,7 +486,7 @@ const Generate = () => {
                 <Button 
                   onClick={() => setStep(2)} 
                   className="bg-[#1E3A5F] hover:bg-[#162B47]"
-                  disabled={!formData.topik.trim()}
+                  disabled={!formData.topik.trim() || (isMultiMode && selectedDocTypes.length === 0)}
                   data-testid="btn-next-step1"
                 >
                   Lanjutkan
@@ -384,7 +501,9 @@ const Generate = () => {
         {step === 2 && (
           <Card className="animate-fadeIn">
             <CardHeader>
-              <CardTitle>Konfigurasi {DOC_TYPE_LABELS[formData.doc_type]}</CardTitle>
+              <CardTitle>
+                Konfigurasi {isMultiMode ? `${selectedDocTypes.length} Dokumen` : DOC_TYPE_LABELS[formData.doc_type]}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Summary */}
@@ -408,11 +527,23 @@ const Generate = () => {
                     <p className="font-medium truncate">{formData.topik}</p>
                   </div>
                 </div>
+                {isMultiMode && (
+                  <div className="mt-3 pt-3 border-t">
+                    <span className="text-slate-500">Dokumen yang akan dibuat:</span>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {selectedDocTypes.map(type => (
+                        <Badge key={type} variant="outline">{DOC_TYPE_LABELS[type]}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Soal-specific config */}
-              {formData.doc_type === "soal" && (
-                <div className="space-y-4">
+              {/* Soal-specific config - show if soal is selected */}
+              {(formData.doc_type === "soal" || selectedDocTypes.includes("soal")) && (
+                <div className="space-y-4 p-4 bg-slate-50 rounded-xl">
+                  <h3 className="font-medium">Konfigurasi Bank Soal</h3>
+                  
                   <div className="space-y-2">
                     <Label>Tingkat Kesulitan</Label>
                     <Select value={formData.tingkat_kesulitan} onValueChange={(v) => setFormData({ ...formData, tingkat_kesulitan: v })}>
@@ -541,7 +672,7 @@ const Generate = () => {
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
                 <Coins className="w-5 h-5 text-amber-600" />
                 <div>
-                  <p className="font-medium text-amber-800">Biaya: 1 Token</p>
+                  <p className="font-medium text-amber-800">Biaya: {getTokenCost()} Token</p>
                   <p className="text-sm text-amber-600">Saldo Anda: {user?.token_balance} token</p>
                 </div>
               </div>
@@ -554,17 +685,17 @@ const Generate = () => {
                 <Button 
                   onClick={handleGenerate} 
                   className="bg-[#F4820A] hover:bg-[#D66E00]"
-                  disabled={loading || user?.token_balance < 1}
+                  disabled={loading || user?.token_balance < getTokenCost()}
                   data-testid="btn-generate"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
+                      {generatingProgress || "Generating..."}
                     </>
                   ) : (
                     <>
-                      Generate Dokumen
+                      Generate {isMultiMode && selectedDocTypes.length > 1 ? `${selectedDocTypes.length} Dokumen` : "Dokumen"}
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </>
                   )}
@@ -575,27 +706,33 @@ const Generate = () => {
         )}
 
         {/* Step 3: Result */}
-        {step === 3 && result && (
+        {step === 3 && (result || multiResults) && (
           <div className="animate-fadeIn space-y-4">
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <Badge className="bg-green-100 text-green-700">Berhasil</Badge>
-                <span className="text-slate-500">Sisa token: {result.remaining_tokens}</span>
+                <span className="text-slate-500">
+                  Sisa token: {multiResults?.remaining_tokens ?? result?.remaining_tokens}
+                </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={() => { setStep(1); setResult(null); }} data-testid="btn-new-doc">
+                <Button variant="outline" onClick={() => { 
+                  setStep(1); 
+                  setResult(null); 
+                  setMultiResults(null);
+                  setSelectedDocTypes([]);
+                  setIsMultiMode(false);
+                }} data-testid="btn-new-doc">
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Buat Baru
                 </Button>
-                <Button variant="outline" onClick={handleExportExcel} data-testid="btn-export-excel">
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Export Excel
-                </Button>
-                <Button variant="outline" onClick={handlePrint} data-testid="btn-print">
-                  <Printer className="w-4 h-4 mr-2" />
-                  Cetak
-                </Button>
+                {multiResults && multiResults.results.length > 1 && (
+                  <Button variant="outline" onClick={handleExportAllExcel} data-testid="btn-export-all-excel">
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Export Semua (Excel)
+                  </Button>
+                )}
                 <Button 
                   className="bg-[#1E3A5F] hover:bg-[#162B47]"
                   onClick={() => navigate("/history")}
@@ -606,15 +743,70 @@ const Generate = () => {
               </div>
             </div>
 
-            {/* Result Content */}
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>{DOC_TYPE_LABELS[formData.doc_type]}: {formData.topik}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                {renderResultContent()}
-              </CardContent>
-            </Card>
+            {/* Single Result */}
+            {result && !multiResults && (
+              <Card>
+                <CardHeader className="border-b flex flex-row items-center justify-between">
+                  <CardTitle>{DOC_TYPE_LABELS[formData.doc_type]}: {formData.topik}</CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleExportExcel(result.result_html, formData.doc_type)}>
+                      <FileSpreadsheet className="w-4 h-4 mr-1" />
+                      Excel
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handlePrint(result.result_html, formData.doc_type, formData.topik)}>
+                      <Printer className="w-4 h-4 mr-1" />
+                      Cetak
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {renderResultContent(result.result_html)}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Multi Results with Tabs */}
+            {multiResults && multiResults.results.length > 0 && (
+              <Card>
+                <CardContent className="p-0">
+                  <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <div className="border-b px-4">
+                      <TabsList className="bg-transparent h-auto p-0 gap-0">
+                        {multiResults.results.map((r) => (
+                          <TabsTrigger 
+                            key={r.doc_type} 
+                            value={r.doc_type}
+                            className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A5F] data-[state=active]:bg-transparent"
+                          >
+                            {DOC_TYPE_LABELS[r.doc_type]}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </div>
+                    {multiResults.results.map((r) => (
+                      <TabsContent key={r.doc_type} value={r.doc_type} className="p-0 m-0">
+                        <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
+                          <h3 className="font-semibold">{DOC_TYPE_LABELS[r.doc_type]}: {formData.topik}</h3>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleExportExcel(r.result_html, r.doc_type)}>
+                              <FileSpreadsheet className="w-4 h-4 mr-1" />
+                              Excel
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handlePrint(r.result_html, r.doc_type, formData.topik)}>
+                              <Printer className="w-4 h-4 mr-1" />
+                              Cetak
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          {renderResultContent(r.result_html)}
+                        </div>
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>
