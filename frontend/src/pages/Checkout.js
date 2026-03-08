@@ -118,32 +118,44 @@ const Checkout = () => {
 
     setLoading(true);
     try {
-      const response = await api.post("/payment/create", {
-        package_id: selectedPackage.id,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        voucher_code: voucherApplied ? voucherCode : null
-      });
+      if (paymentMethod === "bank") {
+        // Bank Transfer - create transaction and redirect to transfer page
+        const response = await api.post("/payment/bank-transfer", {
+          package_id: selectedPackage.id,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          voucher_code: voucherApplied ? voucherCode : null
+        });
+        navigate(`/bank-transfer/${response.data.order_id}`);
+      } else {
+        // E-Wallet / QRIS - use Midtrans
+        const response = await api.post("/payment/create", {
+          package_id: selectedPackage.id,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          voucher_code: voucherApplied ? voucherCode : null
+        });
 
-      // Open Midtrans Snap
-      window.snap.pay(response.data.token, {
-        onSuccess: async function(result) {
-          toast.success("Pembayaran berhasil!");
-          await refreshUser();
-          navigate("/dashboard");
-        },
-        onPending: function(result) {
-          toast.info("Menunggu pembayaran...");
-          navigate("/dashboard");
-        },
-        onError: function(result) {
-          toast.error("Pembayaran gagal");
-        },
-        onClose: function() {
-          toast.info("Popup pembayaran ditutup");
-        }
-      });
+        window.snap.pay(response.data.token, {
+          onSuccess: async function(result) {
+            toast.success("Pembayaran berhasil!");
+            await refreshUser();
+            navigate("/dashboard");
+          },
+          onPending: function(result) {
+            toast.info("Menunggu pembayaran...");
+            navigate("/dashboard");
+          },
+          onError: function(result) {
+            toast.error("Pembayaran gagal");
+          },
+          onClose: function() {
+            toast.info("Popup pembayaran ditutup");
+          }
+        });
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || "Gagal memproses pembayaran");
     } finally {
@@ -409,25 +421,41 @@ const Checkout = () => {
                       )}
                     </div>
 
-                    {/* Payment Method Info */}
+                    {/* Payment Method Selection */}
                     <div className="space-y-3">
                       <Label>Metode Pembayaran</Label>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="border border-slate-200 rounded-xl p-4">
+                        <div 
+                          onClick={() => setPaymentMethod("bank")}
+                          className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
+                            paymentMethod === "bank" 
+                              ? "border-[#10B981] bg-[#10B981]/5" 
+                              : "border-slate-200 hover:border-slate-300"
+                          }`}
+                          data-testid="payment-method-bank"
+                        >
                           <div className="flex items-center gap-2 mb-2">
                             <Building2 className="w-5 h-5 text-slate-600" />
                             <span className="font-medium">Bank Transfer</span>
+                            {paymentMethod === "bank" && <Check className="w-4 h-4 text-[#10B981] ml-auto" />}
                           </div>
                           <div className="flex gap-2">
                             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Bank_Central_Asia.svg/120px-Bank_Central_Asia.svg.png" alt="BCA" className="h-5 object-contain" />
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Logo_BRI.png/120px-Logo_BRI.png" alt="BRI" className="h-5 object-contain" />
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Bank_Mandiri_logo_2016.svg/120px-Bank_Mandiri_logo_2016.svg.png" alt="Mandiri" className="h-5 object-contain" />
                           </div>
                         </div>
-                        <div className="border border-slate-200 rounded-xl p-4">
+                        <div 
+                          onClick={() => setPaymentMethod("ewallet")}
+                          className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
+                            paymentMethod === "ewallet" 
+                              ? "border-[#10B981] bg-[#10B981]/5" 
+                              : "border-slate-200 hover:border-slate-300"
+                          }`}
+                          data-testid="payment-method-ewallet"
+                        >
                           <div className="flex items-center gap-2 mb-2">
                             <Wallet className="w-5 h-5 text-slate-600" />
                             <span className="font-medium">E-Wallet / QRIS</span>
+                            {paymentMethod === "ewallet" && <Check className="w-4 h-4 text-[#10B981] ml-auto" />}
                           </div>
                           <div className="flex gap-2 text-xs text-slate-500">
                             GoPay, OVO, DANA, ShopeePay
@@ -435,7 +463,10 @@ const Checkout = () => {
                         </div>
                       </div>
                       <p className="text-xs text-slate-500">
-                        Semua metode pembayaran tersedia di halaman Midtrans
+                        {paymentMethod === "bank" 
+                          ? "Transfer ke rekening BCA. Upload bukti transfer untuk verifikasi admin."
+                          : "Pembayaran via Midtrans. Otomatis dikonfirmasi."
+                        }
                       </p>
                     </div>
 
@@ -460,10 +491,15 @@ const Checkout = () => {
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             Memproses...
                           </>
+                        ) : paymentMethod === "bank" ? (
+                          <>
+                            <Building2 className="w-4 h-4 mr-2" />
+                            Transfer Bank
+                          </>
                         ) : (
                           <>
                             <CreditCard className="w-4 h-4 mr-2" />
-                            Bayar Sekarang
+                            Bayar via E-Wallet
                           </>
                         )}
                       </Button>

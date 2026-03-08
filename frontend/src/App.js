@@ -12,6 +12,7 @@ import Generate from "./pages/Generate";
 import History from "./pages/History";
 import HistoryDetail from "./pages/HistoryDetail";
 import Checkout from "./pages/Checkout";
+import BankTransfer from "./pages/BankTransfer";
 import SuperAdmin from "./pages/SuperAdmin";
 
 // Protected Route Component
@@ -66,6 +67,9 @@ function App() {
           } />
           <Route path="/checkout/:packageId" element={
             <ProtectedRoute><Checkout /></ProtectedRoute>
+          } />
+          <Route path="/bank-transfer/:orderId" element={
+            <ProtectedRoute><BankTransfer /></ProtectedRoute>
           } />
           
           {/* Admin Routes */}

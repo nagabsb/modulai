@@ -48,7 +48,8 @@ import {
   Bot,
   Key,
   Zap,
-  Trash2
+  Trash2,
+  Check
 } from "lucide-react";
 
 // Admin Dashboard Component
@@ -306,6 +307,8 @@ const AdminTransactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [verifyingId, setVerifyingId] = useState(null);
+  const [proofModal, setProofModal] = useState(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -323,6 +326,31 @@ const AdminTransactions = () => {
     }
   };
 
+  const handleVerify = async (transactionId) => {
+    setVerifyingId(transactionId);
+    try {
+      await api.put(`/admin/transactions/${transactionId}/verify`);
+      toast.success("Transaksi dikonfirmasi! Token ditambahkan ke user.");
+      fetchTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal konfirmasi transaksi");
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const handleReject = async (transactionId) => {
+    try {
+      await api.put(`/admin/transactions/${transactionId}/reject`);
+      toast.success("Transaksi ditolak.");
+      fetchTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal menolak transaksi");
+    }
+  };
+
+  const API_URL = process.env.REACT_APP_BACKEND_URL;
+
   if (loading) return <div className="p-8 text-center">Memuat...</div>;
 
   return (
@@ -337,10 +365,27 @@ const AdminTransactions = () => {
             <SelectItem value="all">Semua</SelectItem>
             <SelectItem value="success">Sukses</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="waiting_verification">Menunggu Verifikasi</SelectItem>
             <SelectItem value="failed">Gagal</SelectItem>
+            <SelectItem value="rejected">Ditolak</SelectItem>
           </SelectContent>
         </Select>
       </div>
+
+      {/* Proof of payment modal */}
+      {proofModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setProofModal(null)}>
+          <div className="bg-white rounded-xl max-w-lg w-full p-4" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold mb-3">Bukti Pembayaran</h3>
+            <img 
+              src={`${API_URL}/api/uploads/${proofModal}`} 
+              alt="Bukti pembayaran" 
+              className="max-w-full max-h-96 object-contain mx-auto rounded-lg"
+            />
+            <Button variant="outline" className="w-full mt-3" onClick={() => setProofModal(null)}>Tutup</Button>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">
@@ -353,27 +398,70 @@ const AdminTransactions = () => {
                 <TableHead>Token</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Payment</TableHead>
+                <TableHead>Bukti TF</TableHead>
                 <TableHead>Tanggal</TableHead>
+                <TableHead>Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions.map((tx) => (
                 <TableRow key={tx.order_id}>
-                  <TableCell className="font-mono text-sm">{tx.order_id}</TableCell>
+                  <TableCell className="font-mono text-xs">{tx.order_id}</TableCell>
                   <TableCell className="capitalize">{tx.package_id}</TableCell>
                   <TableCell>{formatRupiah(tx.gross_amount)}</TableCell>
                   <TableCell>{tx.tokens_to_add}</TableCell>
                   <TableCell>
                     <Badge className={
                       tx.status === "success" ? "bg-green-100 text-green-700" :
+                      tx.status === "waiting_verification" ? "bg-blue-100 text-blue-700" :
                       tx.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                      tx.status === "rejected" ? "bg-red-100 text-red-700" :
                       "bg-red-100 text-red-700"
                     }>
-                      {tx.status}
+                      {tx.status === "waiting_verification" ? "Verifikasi" : tx.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>{tx.payment_type || "-"}</TableCell>
-                  <TableCell>{formatShortDate(tx.created_at)}</TableCell>
+                  <TableCell>
+                    <span className="text-xs">{tx.payment_type === "bank_transfer" ? "Bank TF" : tx.payment_type || "-"}</span>
+                  </TableCell>
+                  <TableCell>
+                    {tx.proof_of_payment ? (
+                      <button 
+                        onClick={() => setProofModal(tx.proof_of_payment)}
+                        className="text-blue-600 hover:text-blue-800"
+                        data-testid={`view-proof-${tx.order_id}`}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <span className="text-slate-300">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">{formatShortDate(tx.created_at)}</TableCell>
+                  <TableCell>
+                    {(tx.status === "waiting_verification" || (tx.status === "pending" && tx.payment_type === "bank_transfer")) && (
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          className="bg-green-600 hover:bg-green-700 h-7 text-xs px-2"
+                          onClick={() => handleVerify(tx.id)}
+                          disabled={verifyingId === tx.id}
+                          data-testid={`verify-${tx.order_id}`}
+                        >
+                          {verifyingId === tx.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="h-7 text-xs px-2 text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => handleReject(tx.id)}
+                          data-testid={`reject-${tx.order_id}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -210,3 +210,56 @@ async def admin_delete_voucher(voucher_id: str, admin: dict = Depends(get_admin_
         raise HTTPException(status_code=404, detail="Voucher tidak ditemukan")
 
     return {"message": "Voucher berhasil dihapus"}
+
+
+
+@router.put("/transactions/{transaction_id}/verify")
+async def admin_verify_transaction(transaction_id: str, admin: dict = Depends(get_admin_user)):
+    transaction = await db.transactions.find_one({"id": transaction_id})
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+
+    if transaction["status"] == "success":
+        raise HTTPException(status_code=400, detail="Transaksi sudah dikonfirmasi sebelumnya")
+
+    # Update transaction status
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": "success",
+            "verified_by": admin["id"],
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    # Add tokens to user
+    await db.users.update_one(
+        {"id": transaction["user_id"]},
+        {"$inc": {"token_balance": transaction["tokens_to_add"]}}
+    )
+
+    logger.info(f"Admin verified transaction {transaction_id}, added {transaction['tokens_to_add']} tokens to user {transaction['user_id']}")
+
+    return {"message": f"Transaksi dikonfirmasi. {transaction['tokens_to_add']} token ditambahkan ke akun user."}
+
+
+@router.put("/transactions/{transaction_id}/reject")
+async def admin_reject_transaction(transaction_id: str, admin: dict = Depends(get_admin_user)):
+    transaction = await db.transactions.find_one({"id": transaction_id})
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+
+    if transaction["status"] == "success":
+        raise HTTPException(status_code=400, detail="Tidak bisa menolak transaksi yang sudah sukses")
+
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": "rejected",
+            "rejected_by": admin["id"],
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    return {"message": "Transaksi ditolak."}
