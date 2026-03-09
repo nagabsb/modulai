@@ -26,9 +26,14 @@
 - [x] No maxOutputTokens limit (AI generates freely)
 - [x] **Chunked soal generation** for large question sets (>15 PG) — prevents proxy timeout
 - [x] **Export: Excel** (.xlsx via @redoper1/xlsx-js-style)
-- [x] **Export: Word** (.doc via Blob API + LaTeX→Unicode converter)
-- [x] **Export: PDF** (via html2pdf.js + KaTeX pre-rendering)
+- [x] **Export: Word** (.doc via Blob API + iterative LaTeX→Unicode converter with nested brace support)
+- [x] **Export: PDF** (via html2pdf.js + KaTeX pre-rendering for math)
 - [x] **Print** (browser print dialog)
+
+### Math Rendering
+- [x] **In-app**: KaTeX renders $..$ and $$...$$ LaTeX delimiters (including simple numbers like $0$)
+- [x] **Word export**: Iterative LaTeX→Unicode conversion handles nested \frac{\sqrt{...}}{...}
+- [x] **PDF export**: KaTeX pre-renders HTML before html2pdf.js captures visually
 
 ### Multi-Key Multi-Provider AI System
 - [x] **3 Providers**: Google Gemini (4 models), Kimi/Moonshot (2 models), OpenAI (2 models)
@@ -55,7 +60,7 @@
 ```
 
 ## Key Files
-- `/app/frontend/src/utils/latexRenderer.js` — LaTeX→KaTeX rendering + LaTeX→Unicode converter
+- `/app/frontend/src/utils/latexRenderer.js` — LaTeX→KaTeX rendering + iterative LaTeX→Unicode converter
 - `/app/frontend/src/utils/exportWord.js` — Word export with LaTeX→Unicode conversion
 - `/app/frontend/src/utils/exportPdf.js` — PDF export with KaTeX pre-rendering
 - `/app/frontend/src/utils/exportExcel.js` — Excel export

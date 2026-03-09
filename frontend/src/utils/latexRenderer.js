@@ -39,12 +39,13 @@ export function renderLatexInHtml(html) {
 /**
  * Convert LaTeX expression to plain Unicode text for Word/PDF export
  * Handles common math expressions used in Indonesian education
+ * Uses iterative approach to handle nested braces (e.g. \frac{-b \pm \sqrt{x}}{2a})
  */
 export function latexToPlainText(tex) {
   if (!tex) return tex;
   let t = tex.trim();
 
-  // Matrix/pmatrix → bracket notation
+  // Matrix/pmatrix → bracket notation (do this first, it's self-contained)
   t = t.replace(/\\begin\{[pbvBV]?matrix\}([\s\S]*?)\\end\{[pbvBV]?matrix\}/g, (_, content) => {
     const rows = content.split('\\\\').map(row =>
       row.split('&').map(cell => cell.trim()).join('  ')
@@ -52,36 +53,8 @@ export function latexToPlainText(tex) {
     return '(' + rows.join(' ; ') + ')';
   });
 
-  // Fractions
-  t = t.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
-  t = t.replace(/\\dfrac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
-
-  // Square root
-  t = t.replace(/\\sqrt\{([^{}]+)\}/g, '√($1)');
-  t = t.replace(/\\sqrt\[(\d+)\]\{([^{}]+)\}/g, '$1√($2)');
-
-  // Superscripts (common)
-  t = t.replace(/\^2(?![0-9])/g, '²');
-  t = t.replace(/\^3(?![0-9])/g, '³');
-  t = t.replace(/\^\{2\}/g, '²');
-  t = t.replace(/\^\{3\}/g, '³');
-  t = t.replace(/\^\{([^{}]+)\}/g, '^($1)');
-
-  // Subscripts
-  t = t.replace(/_\{([^{}]+)\}/g, '_($1)');
-
-  // Greek letters
-  const greekMap = {
-    '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ',
-    '\\epsilon': 'ε', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ',
-    '\\pi': 'π', '\\sigma': 'σ', '\\omega': 'ω', '\\phi': 'φ',
-    '\\Delta': 'Δ', '\\Sigma': 'Σ', '\\Omega': 'Ω',
-  };
-  for (const [latex, unicode] of Object.entries(greekMap)) {
-    t = t.replaceAll(latex, unicode);
-  }
-
-  // Operators and symbols
+  // Replace symbols FIRST (before processing structural commands)
+  // This prevents \pm inside \frac from confusing the brace matching
   const symbolMap = {
     '\\times': '×', '\\div': '÷', '\\cdot': '·', '\\pm': '±',
     '\\mp': '∓', '\\leq': '≤', '\\geq': '≥', '\\neq': '≠',
@@ -96,17 +69,88 @@ export function latexToPlainText(tex) {
     '\\triangle': '△',
     '\\ldots': '…', '\\cdots': '⋯', '\\dots': '…',
     '\\quad': '  ', '\\qquad': '    ',
-    '\\text': '', '\\mathrm': '', '\\mathbf': '', '\\textbf': '',
-    '\\left': '', '\\right': '', '\\Big': '', '\\big': '',
+    '\\left': '', '\\right': '', '\\Big': '', '\\big': '', '\\bigg': '',
     '\\,': ' ', '\\;': ' ', '\\:': ' ', '\\ ': ' ',
   };
   for (const [latex, unicode] of Object.entries(symbolMap)) {
     t = t.replaceAll(latex, unicode);
   }
 
-  // Remove remaining braces
-  t = t.replace(/\{([^{}]*)\}/g, '$1');
-  t = t.replace(/\{([^{}]*)\}/g, '$1'); // nested
+  // Greek letters
+  const greekMap = {
+    '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ',
+    '\\epsilon': 'ε', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ',
+    '\\pi': 'π', '\\sigma': 'σ', '\\omega': 'ω', '\\phi': 'φ',
+    '\\Delta': 'Δ', '\\Sigma': 'Σ', '\\Omega': 'Ω',
+  };
+  for (const [latex, unicode] of Object.entries(greekMap)) {
+    t = t.replaceAll(latex, unicode);
+  }
+
+  // Text commands: \text{...}, \mathrm{...}, \mathbf{...}, \textbf{...}
+  t = t.replace(/\\(?:text|mathrm|mathbf|textbf|mathit|textit|operatorname)\{([^{}]*)\}/g, '$1');
+
+  // Iteratively resolve nested structures from innermost to outermost
+  // Each pass resolves one level of nesting. Repeat until stable.
+  let prevT;
+  let iterations = 0;
+  do {
+    prevT = t;
+
+    // 1. Square root (innermost first)
+    t = t.replace(/\\sqrt\[(\d+)\]\{([^{}]*)\}/g, '$1√($2)');
+    t = t.replace(/\\sqrt\{([^{}]*)\}/g, '√($1)');
+
+    // 2. Fractions (after sqrt is resolved, braces inside become plain)
+    t = t.replace(/\\d?frac\{([^{}]*)\}\{([^{}]*)\}/g, '($1)/($2)');
+
+    // 3. Superscripts
+    t = t.replace(/\^\{([^{}]*)\}/g, (_, content) => {
+      // Common superscripts to unicode
+      if (content === '2') return '²';
+      if (content === '3') return '³';
+      if (content === '0') return '⁰';
+      if (content === '1') return '¹';
+      if (content === 'n') return 'ⁿ';
+      return '^(' + content + ')';
+    });
+
+    // 4. Subscripts
+    t = t.replace(/_\{([^{}]*)\}/g, (_, content) => {
+      if (content === '0') return '₀';
+      if (content === '1') return '₁';
+      if (content === '2') return '₂';
+      if (content === '3') return '₃';
+      if (content === 'n') return 'ₙ';
+      if (content === 'k') return 'ₖ';
+      return '_(' + content + ')';
+    });
+
+    // 5. \overline, \underline, \hat, \bar, \vec
+    t = t.replace(/\\(?:overline|bar)\{([^{}]*)\}/g, '$1̄');
+    t = t.replace(/\\(?:underline)\{([^{}]*)\}/g, '$1');
+    t = t.replace(/\\hat\{([^{}]*)\}/g, '$1̂');
+    t = t.replace(/\\vec\{([^{}]*)\}/g, '$1⃗');
+
+    // 6. Remove remaining single-level braces
+    t = t.replace(/\{([^{}]*)\}/g, '$1');
+
+    iterations++;
+  } while (t !== prevT && iterations < 10);
+
+  // Simple superscripts without braces
+  t = t.replace(/\^2(?![0-9])/g, '²');
+  t = t.replace(/\^3(?![0-9])/g, '³');
+  t = t.replace(/\^n(?![a-z])/g, 'ⁿ');
+
+  // Simple subscripts without braces
+  t = t.replace(/_1(?![0-9])/g, '₁');
+  t = t.replace(/_2(?![0-9])/g, '₂');
+  t = t.replace(/_0(?![0-9])/g, '₀');
+  t = t.replace(/_n(?![a-z])/g, 'ₙ');
+
+  // Clean up any remaining backslash commands
+  t = t.replace(/\\[a-zA-Z]+/g, '');
 
   return t.trim();
 }
