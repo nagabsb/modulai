@@ -4,7 +4,7 @@
 **ModulAI** adalah Generator Perangkat Ajar AI untuk Guru Indonesia dengan sistem token, pembayaran, dan admin panel.
 
 ## Tech Stack
-- **Frontend**: React + Tailwind CSS + Shadcn UI + KaTeX (math rendering)
+- **Frontend**: React + Tailwind CSS + Shadcn UI + KaTeX (math rendering) + html2pdf.js
 - **Backend**: FastAPI (Python) + MongoDB (modular architecture)
 - **AI**: Multi-provider (Gemini, Kimi/Moonshot, OpenAI) with fallback chain
 - **Payment**: Midtrans (Sandbox) + Bank Transfer Manual (BCA)
@@ -22,18 +22,19 @@
 - [x] 5 jenis: Modul Ajar, RPP, LKPD, Bank Soal, Rubrik Asesmen
 - [x] Multi-document generation with tabbed results
 - [x] LaTeX/KaTeX rendering, HTML terstruktur, Daftar Pustaka
-- [x] SVG Physics Diagrams, Excel Export
+- [x] SVG Physics Diagrams
 - [x] No maxOutputTokens limit (AI generates freely)
+- [x] **Chunked soal generation** for large question sets (>15 PG) — prevents proxy timeout
+- [x] **Export: Excel** (.xlsx via @redoper1/xlsx-js-style)
+- [x] **Export: Word** (.doc via Blob API with Word-compatible HTML wrapper)
+- [x] **Export: PDF** (via html2pdf.js with KaTeX support)
+- [x] **Print** (browser print dialog)
 
 ### Multi-Key Multi-Provider AI System
 - [x] **3 Providers**: Google Gemini (4 models), Kimi/Moonshot (2 models), OpenAI (2 models)
 - [x] **Fallback Chain**: Keys tried in priority order, auto-fallback on failure
 - [x] **Admin CRUD**: Add/delete/toggle/reorder API keys from UI
 - [x] **Pricing Info**: Per-provider pricing table in admin panel
-- [x] **Models supported**:
-  - Gemini: 2.5 Flash, 2.5 Flash-Lite, 2.5 Pro, 2.0 Flash
-  - Kimi: K2.5, K2.5 Instant
-  - OpenAI: GPT-4o Mini, GPT-4o
 
 ### Payment Integration
 - [x] E-Wallet/QRIS via Midtrans
@@ -50,8 +51,15 @@
 ├── server.py, database.py, config.py, models.py, auth.py, prompts.py
 ├── routes/ (auth_routes, generate_routes, payment_routes, admin_routes)
 ├── uploads/ (proof of payment images)
-├── tests/ (test_ai_keys.py)
+├── tests/ (test_chunked_soal.py)
 ```
+
+## Key Files
+- `/app/frontend/src/utils/exportWord.js` — Word export utility
+- `/app/frontend/src/utils/exportPdf.js` — PDF export utility  
+- `/app/frontend/src/utils/exportExcel.js` — Excel export utility
+- `/app/backend/routes/generate_routes.py` — AI gen with chunking + save endpoint
+- `/app/backend/prompts.py` — Prompts with section-specific builders
 
 ## API Credentials
 - **Super Admin**: ipankpaul107@gmail.com / Kakiku5.
@@ -61,14 +69,13 @@
 ## Next Tasks / Backlog
 
 ### P1 (Important)
-- [ ] Word export yang lebih baik
-- [ ] Diagram untuk mata pelajaran lain
+- [ ] Diagram untuk mata pelajaran lain (Chart.js, stock images)
 - [ ] Ubah label "Token" → "Generate" di UI
 
 ### P2 (Nice to have)
 - [ ] User upload gambar untuk soal
+- [ ] Dynamic pricing (biaya bervariasi berdasarkan kompleksitas)
 - [ ] Rate limiting per user
-- [ ] User profile settings page
 
 ### P3 (Future)
 - [ ] Real email integration (Mailketing)
