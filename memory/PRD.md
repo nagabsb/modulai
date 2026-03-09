@@ -6,7 +6,7 @@
 ## Tech Stack
 - **Frontend**: React + Tailwind CSS + Shadcn UI + KaTeX (math rendering)
 - **Backend**: FastAPI (Python) + MongoDB (modular architecture)
-- **AI**: Google Gemini API (2.5-flash / 2.5-pro)
+- **AI**: Multi-provider (Gemini, Kimi/Moonshot, OpenAI) with fallback chain
 - **Payment**: Midtrans (Sandbox) + Bank Transfer Manual (BCA)
 - **Email**: Mailketing (MOCKED)
 
@@ -23,20 +23,26 @@
 - [x] Multi-document generation with tabbed results
 - [x] LaTeX/KaTeX rendering, HTML terstruktur, Daftar Pustaka
 - [x] SVG Physics Diagrams, Excel Export
+- [x] No maxOutputTokens limit (AI generates freely)
+
+### Multi-Key Multi-Provider AI System
+- [x] **3 Providers**: Google Gemini (4 models), Kimi/Moonshot (2 models), OpenAI (2 models)
+- [x] **Fallback Chain**: Keys tried in priority order, auto-fallback on failure
+- [x] **Admin CRUD**: Add/delete/toggle/reorder API keys from UI
+- [x] **Pricing Info**: Per-provider pricing table in admin panel
+- [x] **Models supported**:
+  - Gemini: 2.5 Flash, 2.5 Flash-Lite, 2.5 Pro, 2.0 Flash
+  - Kimi: K2.5, K2.5 Instant
+  - OpenAI: GPT-4o Mini, GPT-4o
 
 ### Payment Integration
-- [x] **E-Wallet/QRIS**: Midtrans Snap.js popup, auto-confirm via webhook
-- [x] **Bank Transfer**: Manual ke BCA 2470230889 (Najmi Abubakar Basumbul)
-  - User upload bukti transfer
-  - Admin verifikasi/tolak dari dashboard
-  - Kode unik (1-999) untuk identifikasi transfer
-  - Auto-refresh halaman transfer setiap 15 detik
-- [x] Voucher system (create, toggle, delete)
+- [x] E-Wallet/QRIS via Midtrans
+- [x] Bank Transfer to BCA 2470230889 (Najmi Abubakar Basumbul) with proof upload
+- [x] Voucher system
 
 ### Super Admin Panel
-- [x] Dashboard, User management, Transaction monitoring
-- [x] Voucher management, AI Settings
-- [x] Bank transfer verification: view proof, approve/reject, filter by status
+- [x] Dashboard, User management, Transaction monitoring (with verify/reject bank transfers)
+- [x] Voucher management, AI Settings (multi-key management)
 
 ## Backend Architecture
 ```
@@ -44,18 +50,17 @@
 ├── server.py, database.py, config.py, models.py, auth.py, prompts.py
 ├── routes/ (auth_routes, generate_routes, payment_routes, admin_routes)
 ├── uploads/ (proof of payment images)
+├── tests/ (test_ai_keys.py)
 ```
 
 ## API Credentials
 - **Super Admin**: ipankpaul107@gmail.com / Kakiku5.
 - **BCA Account**: 2470230889 / NAJMI ABUBAKAR BASUMBUL
 - **Midtrans Sandbox**: SB-Mid-client-RlztC9s1e9UMUkE6
-- **Sample Voucher**: GURU2024 (20% discount)
 
 ## Next Tasks / Backlog
 
 ### P1 (Important)
-- [ ] Multi-provider AI system (Gemini + OpenAI + Claude)
 - [ ] Word export yang lebih baik
 - [ ] Diagram untuk mata pelajaran lain
 - [ ] Ubah label "Token" → "Generate" di UI
