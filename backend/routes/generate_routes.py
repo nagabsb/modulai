@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import uuid
 import re
@@ -10,6 +11,7 @@ from config import GEMINI_API_KEY, TOKEN_PACKAGES, AI_PROVIDERS
 from auth import get_current_user
 from models import GenerateRequest, MultiGenerateRequest, SaveGenerationRequest
 from prompts import build_prompt
+from docx_export import html_to_docx
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +243,37 @@ async def save_chunked_generation(data: SaveGenerationRequest, user: dict = Depe
         "tokens_used": 1,
         "remaining_tokens": updated_user["token_balance"]
     }
+
+
+
+@router.get("/export/docx/{generation_id}")
+async def export_docx(generation_id: str, user: dict = Depends(get_current_user)):
+    """Export a generation to proper DOCX with native Word math equations"""
+    generation = await db.generations.find_one(
+        {"id": generation_id, "user_id": user["id"]},
+        {"_id": 0}
+    )
+    if not generation:
+        raise HTTPException(status_code=404, detail="Dokumen tidak ditemukan")
+
+    html_content = generation.get("result_html", "")
+    form_data = generation.get("form_data", {})
+
+    title = f"{form_data.get('doc_type', 'dokumen')}_{form_data.get('mata_pelajaran', '')}_{form_data.get('topik', '')}".replace(" ", "_")
+
+    try:
+        docx_buffer = html_to_docx(html_content, title)
+    except Exception as e:
+        logger.error(f"DOCX export error: {e}")
+        raise HTTPException(status_code=500, detail="Gagal membuat file DOCX")
+
+    filename = f"{title[:50]}.docx"
+
+    return StreamingResponse(
+        docx_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 

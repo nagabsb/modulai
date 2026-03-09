@@ -359,12 +359,30 @@ const Generate = () => {
     }
   };
 
-  const handleExportWord = (html, docType) => {
+  const handleExportWord = async (html, docType) => {
     try {
-      const filename = `${DOC_TYPE_LABELS[docType]}_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
-      const title = `${DOC_TYPE_LABELS[docType]} - ${formData.topik}`;
-      exportToWord(html, filename, title);
-      toast.success("File Word berhasil didownload!");
+      // For saved results, use backend DOCX generation (proper math)
+      const genId = result?.id || multiResults?.results?.find(r => r.doc_type === docType)?.id;
+      if (genId) {
+        toast.info("Membuat file Word...");
+        const response = await api.get(`/export/docx/${genId}`, { responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = `${DOC_TYPE_LABELS[docType]}_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
+        link.download = `${filename}.docx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success("File Word berhasil didownload!");
+      } else {
+        // Fallback: client-side export
+        const filename = `${DOC_TYPE_LABELS[docType]}_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
+        const title = `${DOC_TYPE_LABELS[docType]} - ${formData.topik}`;
+        exportToWord(html, filename, title);
+        toast.success("File Word berhasil didownload!");
+      }
     } catch (error) {
       toast.error("Gagal export ke Word");
       console.error(error);

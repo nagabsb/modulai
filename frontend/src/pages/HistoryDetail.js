@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import api from "../utils/api";
 import { exportToExcel } from "../utils/exportExcel";
-import { exportToWord } from "../utils/exportWord";
 import { exportToPdf } from "../utils/exportPdf";
 import { parseDiagramsInContent, hasDiagrams } from "../utils/diagramParser";
 import { processGeneratedContent } from "../utils/latexRenderer";
@@ -77,13 +77,23 @@ const HistoryDetail = () => {
     }
   };
 
-  const handleExportWord = () => {
+  const handleExportWord = async () => {
     try {
+      toast.info("Membuat file Word...");
+      const response = await api.get(`/export/docx/${id}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
       const filename = `${DOC_TYPE_LABELS[generation.doc_type]}_${generation.form_data?.mata_pelajaran}_Kelas${generation.form_data?.kelas}`.replace(/\s+/g, '_');
-      const title = `${DOC_TYPE_LABELS[generation.doc_type]} - ${generation.form_data?.topik}`;
-      exportToWord(generation.result_html, filename, title);
+      link.download = `${filename}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("File Word berhasil didownload!");
     } catch (error) {
       console.error("Word export failed", error);
+      toast.error("Gagal export ke Word");
     }
   };
 
