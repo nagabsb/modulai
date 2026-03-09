@@ -22,8 +22,6 @@ export function renderLatexInHtml(html) {
 
   // Then handle inline math ($...$) - but not already processed ones
   processed = processed.replace(/\$([^\$\n]+?)\$/g, (match, tex) => {
-    // Skip if it looks like currency (e.g. $100)
-    if (/^\d+[.,]?\d*$/.test(tex.trim())) return match;
     try {
       return katex.renderToString(tex.trim(), {
         displayMode: false,
@@ -33,6 +31,101 @@ export function renderLatexInHtml(html) {
     } catch (e) {
       return match;
     }
+  });
+
+  return processed;
+}
+
+/**
+ * Convert LaTeX expression to plain Unicode text for Word/PDF export
+ * Handles common math expressions used in Indonesian education
+ */
+export function latexToPlainText(tex) {
+  if (!tex) return tex;
+  let t = tex.trim();
+
+  // Matrix/pmatrix → bracket notation
+  t = t.replace(/\\begin\{[pbvBV]?matrix\}([\s\S]*?)\\end\{[pbvBV]?matrix\}/g, (_, content) => {
+    const rows = content.split('\\\\').map(row =>
+      row.split('&').map(cell => cell.trim()).join('  ')
+    );
+    return '(' + rows.join(' ; ') + ')';
+  });
+
+  // Fractions
+  t = t.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
+  t = t.replace(/\\dfrac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
+
+  // Square root
+  t = t.replace(/\\sqrt\{([^{}]+)\}/g, '√($1)');
+  t = t.replace(/\\sqrt\[(\d+)\]\{([^{}]+)\}/g, '$1√($2)');
+
+  // Superscripts (common)
+  t = t.replace(/\^2(?![0-9])/g, '²');
+  t = t.replace(/\^3(?![0-9])/g, '³');
+  t = t.replace(/\^\{2\}/g, '²');
+  t = t.replace(/\^\{3\}/g, '³');
+  t = t.replace(/\^\{([^{}]+)\}/g, '^($1)');
+
+  // Subscripts
+  t = t.replace(/_\{([^{}]+)\}/g, '_($1)');
+
+  // Greek letters
+  const greekMap = {
+    '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ',
+    '\\epsilon': 'ε', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ',
+    '\\pi': 'π', '\\sigma': 'σ', '\\omega': 'ω', '\\phi': 'φ',
+    '\\Delta': 'Δ', '\\Sigma': 'Σ', '\\Omega': 'Ω',
+  };
+  for (const [latex, unicode] of Object.entries(greekMap)) {
+    t = t.replaceAll(latex, unicode);
+  }
+
+  // Operators and symbols
+  const symbolMap = {
+    '\\times': '×', '\\div': '÷', '\\cdot': '·', '\\pm': '±',
+    '\\mp': '∓', '\\leq': '≤', '\\geq': '≥', '\\neq': '≠',
+    '\\approx': '≈', '\\equiv': '≡', '\\infty': '∞',
+    '\\Rightarrow': '⇒', '\\rightarrow': '→', '\\Leftarrow': '⇐',
+    '\\leftarrow': '←', '\\leftrightarrow': '↔',
+    '\\therefore': '∴', '\\because': '∵',
+    '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\cup': '∪', '\\cap': '∩',
+    '\\sum': 'Σ', '\\prod': 'Π', '\\int': '∫',
+    '\\partial': '∂', '\\nabla': '∇',
+    '\\angle': '∠', '\\perp': '⊥', '\\parallel': '∥',
+    '\\triangle': '△',
+    '\\ldots': '…', '\\cdots': '⋯', '\\dots': '…',
+    '\\quad': '  ', '\\qquad': '    ',
+    '\\text': '', '\\mathrm': '', '\\mathbf': '', '\\textbf': '',
+    '\\left': '', '\\right': '', '\\Big': '', '\\big': '',
+    '\\,': ' ', '\\;': ' ', '\\:': ' ', '\\ ': ' ',
+  };
+  for (const [latex, unicode] of Object.entries(symbolMap)) {
+    t = t.replaceAll(latex, unicode);
+  }
+
+  // Remove remaining braces
+  t = t.replace(/\{([^{}]*)\}/g, '$1');
+  t = t.replace(/\{([^{}]*)\}/g, '$1'); // nested
+
+  return t.trim();
+}
+
+/**
+ * Convert HTML with LaTeX delimiters to plain text with Unicode math
+ * Used for Word export where KaTeX HTML rendering is not supported
+ */
+export function convertLatexToPlainInHtml(html) {
+  if (!html) return html;
+
+  // Display math
+  let processed = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
+    return latexToPlainText(tex);
+  });
+
+  // Inline math
+  processed = processed.replace(/\$([^\$\n]+?)\$/g, (_, tex) => {
+    return latexToPlainText(tex);
   });
 
   return processed;

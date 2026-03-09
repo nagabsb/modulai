@@ -26,8 +26,8 @@
 - [x] No maxOutputTokens limit (AI generates freely)
 - [x] **Chunked soal generation** for large question sets (>15 PG) — prevents proxy timeout
 - [x] **Export: Excel** (.xlsx via @redoper1/xlsx-js-style)
-- [x] **Export: Word** (.doc via Blob API with Word-compatible HTML wrapper)
-- [x] **Export: PDF** (via html2pdf.js with KaTeX support)
+- [x] **Export: Word** (.doc via Blob API + LaTeX→Unicode converter)
+- [x] **Export: PDF** (via html2pdf.js + KaTeX pre-rendering)
 - [x] **Print** (browser print dialog)
 
 ### Multi-Key Multi-Provider AI System
@@ -55,9 +55,10 @@
 ```
 
 ## Key Files
-- `/app/frontend/src/utils/exportWord.js` — Word export utility
-- `/app/frontend/src/utils/exportPdf.js` — PDF export utility  
-- `/app/frontend/src/utils/exportExcel.js` — Excel export utility
+- `/app/frontend/src/utils/latexRenderer.js` — LaTeX→KaTeX rendering + LaTeX→Unicode converter
+- `/app/frontend/src/utils/exportWord.js` — Word export with LaTeX→Unicode conversion
+- `/app/frontend/src/utils/exportPdf.js` — PDF export with KaTeX pre-rendering
+- `/app/frontend/src/utils/exportExcel.js` — Excel export
 - `/app/backend/routes/generate_routes.py` — AI gen with chunking + save endpoint
 - `/app/backend/prompts.py` — Prompts with section-specific builders
 
