@@ -77,12 +77,31 @@ async def startup():
         await db.settings.insert_one({
             "key": "ai_settings",
             "value": {
-                "provider": "gemini_flash_lite",
-                "gemini_api_key": GEMINI_API_KEY,
+                "provider": "gemini",
                 "model": "gemini-2.5-flash"
             }
         })
         logger.info("Initialized AI settings")
+
+    # Migrate: if no ai_keys exist but GEMINI_API_KEY is set, create default key
+    existing_keys = await db.ai_keys.count_documents({})
+    if existing_keys == 0 and GEMINI_API_KEY:
+        import uuid as _uuid
+        await db.ai_keys.insert_one({
+            "id": str(_uuid.uuid4()),
+            "provider": "gemini",
+            "model": "gemini-2.5-flash",
+            "api_key": GEMINI_API_KEY,
+            "label": "Gemini Flash (Default)",
+            "priority": 1,
+            "is_active": True,
+            "usage_count": 0,
+            "last_used": None,
+            "last_error": None,
+            "last_error_at": None,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        logger.info("Migrated default Gemini API key to ai_keys collection")
 
 
 @app.on_event("shutdown")

@@ -6,7 +6,7 @@ import httpx
 import logging
 
 from database import db
-from config import GEMINI_API_KEY, TOKEN_PACKAGES
+from config import GEMINI_API_KEY, TOKEN_PACKAGES, AI_PROVIDERS
 from auth import get_current_user
 from models import GenerateRequest, MultiGenerateRequest
 from prompts import build_prompt
@@ -16,64 +16,141 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
-async def get_ai_settings():
-    """Get AI settings from database or use defaults"""
-    settings = await db.settings.find_one({"key": "ai_settings"})
-    if settings:
-        return settings["value"]
-    return {
-        "provider": "gemini_flash_lite",
-        "gemini_api_key": GEMINI_API_KEY,
-        "model": "gemini-2.5-flash"
-    }
+async def get_active_keys():
+    """Get all active AI keys sorted by priority"""
+    keys = await db.ai_keys.find(
+        {"is_active": True}, {"_id": 0}
+    ).sort("priority", 1).to_list(100)
+    return keys
 
 
-async def generate_with_gemini(prompt: str) -> str:
-    """Generate content using Gemini API directly"""
-    ai_settings = await get_ai_settings()
-    api_key = ai_settings.get("gemini_api_key") or GEMINI_API_KEY
-
-    provider = ai_settings.get("provider", "gemini_flash_lite")
-    if provider == "gemini_pro":
-        model = "gemini-2.5-pro"
-    else:
-        model = "gemini-2.5-flash"
-
+async def call_gemini(api_key: str, model: str, prompt: str) -> str:
+    """Call Google Gemini API"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": prompt
-            }]
-        }],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.7,
             "topK": 40,
             "topP": 0.95,
-            "maxOutputTokens": 8192,
         }
     }
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        response = await client.post(url, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        if "candidates" in data and len(data["candidates"]) > 0:
+            candidate = data["candidates"][0]
+            if "content" in candidate and "parts" in candidate["content"]:
+                return candidate["content"]["parts"][0].get("text", "")
+        raise Exception("Empty response from Gemini")
 
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
 
-            if "candidates" in data and len(data["candidates"]) > 0:
-                candidate = data["candidates"][0]
-                if "content" in candidate and "parts" in candidate["content"]:
-                    text = candidate["content"]["parts"][0].get("text", "")
-                    return text
+async def call_kimi(api_key: str, model: str, prompt: str) -> str:
+    """Call Kimi/Moonshot API (OpenAI-compatible)"""
+    url = "https://api.moonshot.cn/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    
+    extra = {}
+    if model == "kimi-k2.5-instant":
+        model = "kimi-k2.5"
+        extra = {"thinking": {"type": "disabled"}}
+    
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "Kamu adalah AI pembuat perangkat ajar pendidikan Indonesia yang ahli dan berpengalaman. Output selalu dalam format HTML yang terstruktur."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+        **extra
+    }
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
 
-            raise HTTPException(status_code=500, detail="Empty response from AI")
-    except httpx.HTTPStatusError as e:
-        logger.error(f"Gemini API error: {e.response.text}")
-        raise HTTPException(status_code=500, detail=f"Gagal generate dokumen: {e.response.text}")
-    except Exception as e:
-        logger.error(f"Gemini generation error: {e}")
-        raise HTTPException(status_code=500, detail=f"Gagal generate dokumen: {str(e)}")
+
+async def call_openai(api_key: str, model: str, prompt: str) -> str:
+    """Call OpenAI API"""
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "Kamu adalah AI pembuat perangkat ajar pendidikan Indonesia yang ahli dan berpengalaman. Output selalu dalam format HTML yang terstruktur."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+    }
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
+
+
+PROVIDER_CALLERS = {
+    "gemini": call_gemini,
+    "kimi": call_kimi,
+    "openai": call_openai,
+}
+
+
+async def generate_with_ai(prompt: str) -> str:
+    """Generate content using AI with multi-key fallback"""
+    keys = await get_active_keys()
+
+    # Fallback: if no keys in DB, use env GEMINI_API_KEY
+    if not keys and GEMINI_API_KEY:
+        keys = [{
+            "id": "default",
+            "provider": "gemini",
+            "model": "gemini-2.5-flash",
+            "api_key": GEMINI_API_KEY,
+            "priority": 0,
+            "label": "Default Gemini Key"
+        }]
+
+    if not keys:
+        raise HTTPException(status_code=500, detail="Tidak ada API key aktif. Tambahkan key di Admin Panel → AI Settings.")
+
+    last_error = None
+    for key_config in keys:
+        provider = key_config["provider"]
+        caller = PROVIDER_CALLERS.get(provider)
+        if not caller:
+            logger.warning(f"Unknown provider: {provider}")
+            continue
+
+        try:
+            logger.info(f"Trying key '{key_config.get('label', key_config['id'])}' ({provider}/{key_config['model']})")
+            result = await caller(key_config["api_key"], key_config["model"], prompt)
+
+            # Update success stats
+            if key_config["id"] != "default":
+                await db.ai_keys.update_one(
+                    {"id": key_config["id"]},
+                    {"$set": {"last_used": datetime.now(timezone.utc).isoformat(), "last_error": None},
+                     "$inc": {"usage_count": 1}}
+                )
+            return result
+
+        except Exception as e:
+            last_error = str(e)
+            logger.error(f"Key '{key_config.get('label', key_config['id'])}' failed: {last_error}")
+            if key_config["id"] != "default":
+                await db.ai_keys.update_one(
+                    {"id": key_config["id"]},
+                    {"$set": {
+                        "last_error": last_error[:200],
+                        "last_error_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+            continue
+
+    raise HTTPException(status_code=500, detail=f"Semua API key gagal. Error terakhir: {last_error}")
 
 
 @router.get("/packages")
@@ -84,13 +161,19 @@ async def get_packages():
     return TOKEN_PACKAGES
 
 
+@router.get("/ai-providers")
+async def get_ai_providers_info():
+    """Get available AI providers and models with pricing"""
+    return AI_PROVIDERS
+
+
 @router.post("/generate")
 async def generate_document(data: GenerateRequest, user: dict = Depends(get_current_user)):
     if user["token_balance"] < 1:
         raise HTTPException(status_code=402, detail="Token tidak mencukupi. Silakan top up.")
 
     prompt = build_prompt(data)
-    result_html = await generate_with_gemini(prompt)
+    result_html = await generate_with_ai(prompt)
 
     result_html = re.sub(r'^```html?\n?', '', result_html)
     result_html = re.sub(r'\n?```$', '', result_html)
@@ -174,7 +257,7 @@ async def generate_multi_documents(data: MultiGenerateRequest, user: dict = Depe
         )
 
         prompt = build_prompt(single_request)
-        result_html = await generate_with_gemini(prompt)
+        result_html = await generate_with_ai(prompt)
 
         result_html = re.sub(r'^```html?\n?', '', result_html)
         result_html = re.sub(r'\n?```$', '', result_html)

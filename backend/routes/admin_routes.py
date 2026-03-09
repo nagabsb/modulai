@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends, Body
+from typing import Optional, List
 from datetime import datetime, timezone
+from pydantic import BaseModel
 import uuid
 import logging
 
 from database import db
-from config import GEMINI_API_KEY
+from config import GEMINI_API_KEY, AI_PROVIDERS
 from auth import get_admin_user
-from models import AdminUserUpdate, SettingsUpdate, AISettingsUpdate, VoucherUpdate
+from models import AdminUserUpdate, SettingsUpdate, VoucherUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -132,37 +133,102 @@ async def admin_update_settings(data: SettingsUpdate, admin: dict = Depends(get_
     return {"message": "Setting berhasil diupdate"}
 
 
-@router.get("/ai-settings")
-async def admin_get_ai_settings(admin: dict = Depends(get_admin_user)):
-    from routes.generate_routes import get_ai_settings
-    settings = await get_ai_settings()
-    if settings.get("gemini_api_key"):
-        key = settings["gemini_api_key"]
-        settings["gemini_api_key_masked"] = f"{key[:10]}...{key[-4:]}" if len(key) > 14 else "***"
-    return settings
+# --- AI Keys Management ---
+
+class AIKeyCreate(BaseModel):
+    provider: str
+    model: str
+    api_key: str
+    label: Optional[str] = None
 
 
-@router.put("/ai-settings")
-async def admin_update_ai_settings(data: AISettingsUpdate, admin: dict = Depends(get_admin_user)):
-    from routes.generate_routes import get_ai_settings
-    current = await get_ai_settings()
+class AIKeyUpdate(BaseModel):
+    is_active: Optional[bool] = None
+    priority: Optional[int] = None
+    label: Optional[str] = None
 
-    update_value = {
+
+@router.get("/ai-keys")
+async def admin_get_ai_keys(admin: dict = Depends(get_admin_user)):
+    keys = await db.ai_keys.find({}, {"_id": 0}).sort("priority", 1).to_list(100)
+    # Mask API keys
+    for k in keys:
+        raw = k.get("api_key", "")
+        k["api_key_masked"] = f"{raw[:8]}...{raw[-4:]}" if len(raw) > 12 else "***"
+        del k["api_key"]
+    return keys
+
+
+@router.post("/ai-keys")
+async def admin_create_ai_key(data: AIKeyCreate, admin: dict = Depends(get_admin_user)):
+    # Validate provider and model
+    if data.provider not in AI_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Provider tidak dikenal: {data.provider}")
+    if data.model not in AI_PROVIDERS[data.provider]["models"]:
+        raise HTTPException(status_code=400, detail=f"Model tidak valid untuk {data.provider}: {data.model}")
+
+    # Get next priority
+    max_priority = await db.ai_keys.find_one(sort=[("priority", -1)])
+    next_priority = (max_priority.get("priority", 0) + 1) if max_priority else 1
+
+    model_info = AI_PROVIDERS[data.provider]["models"][data.model]
+    key_doc = {
+        "id": str(uuid.uuid4()),
         "provider": data.provider,
-        "gemini_api_key": data.gemini_api_key if data.gemini_api_key else current.get("gemini_api_key", GEMINI_API_KEY)
+        "model": data.model,
+        "api_key": data.api_key,
+        "label": data.label or f"{model_info['name']} Key {next_priority}",
+        "priority": next_priority,
+        "is_active": True,
+        "usage_count": 0,
+        "last_used": None,
+        "last_error": None,
+        "last_error_at": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
+    await db.ai_keys.insert_one(key_doc)
+    key_doc.pop("_id", None)
+    key_doc["api_key_masked"] = f"{data.api_key[:8]}...{data.api_key[-4:]}" if len(data.api_key) > 12 else "***"
+    del key_doc["api_key"]
+    return key_doc
 
-    if data.provider == "gemini_pro":
-        update_value["model"] = "gemini-2.5-pro"
-    else:
-        update_value["model"] = "gemini-2.5-flash"
 
-    await db.settings.update_one(
-        {"key": "ai_settings"},
-        {"$set": {"key": "ai_settings", "value": update_value}},
-        upsert=True
-    )
-    return {"message": "AI settings berhasil diupdate"}
+class AIKeyReorder(BaseModel):
+    key_ids: List[str]
+
+
+@router.put("/ai-keys/reorder")
+async def admin_reorder_ai_keys(data: AIKeyReorder, admin: dict = Depends(get_admin_user)):
+    for i, key_id in enumerate(data.key_ids):
+        await db.ai_keys.update_one({"id": key_id}, {"$set": {"priority": i + 1}})
+    return {"message": "Urutan key berhasil diubah"}
+
+
+@router.put("/ai-keys/{key_id}")
+async def admin_update_ai_key(key_id: str, data: AIKeyUpdate, admin: dict = Depends(get_admin_user)):
+    update_data = {}
+    if data.is_active is not None:
+        update_data["is_active"] = data.is_active
+    if data.priority is not None:
+        update_data["priority"] = data.priority
+    if data.label is not None:
+        update_data["label"] = data.label
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Tidak ada data untuk diupdate")
+
+    result = await db.ai_keys.update_one({"id": key_id}, {"$set": update_data})
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Key tidak ditemukan")
+    return {"message": "Key berhasil diupdate"}
+
+
+@router.delete("/ai-keys/{key_id}")
+async def admin_delete_ai_key(key_id: str, admin: dict = Depends(get_admin_user)):
+    result = await db.ai_keys.delete_one({"id": key_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Key tidak ditemukan")
+    return {"message": "Key berhasil dihapus"}
 
 
 @router.post("/vouchers")

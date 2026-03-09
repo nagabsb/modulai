@@ -49,7 +49,10 @@ import {
   Key,
   Zap,
   Trash2,
-  Check
+  Check,
+  Plus,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 
 // Admin Dashboard Component
@@ -651,27 +654,32 @@ const AdminVouchers = () => {
 
 // Admin AI Settings Component
 const AdminAISettings = () => {
-  const [settings, setSettings] = useState(null);
+  const [keys, setKeys] = useState([]);
+  const [providers, setProviders] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    provider: "gemini_flash_lite",
-    gemini_api_key: ""
-  });
+  const [showAddForm, setShowAddForm] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [newKey, setNewKey] = useState({
+    provider: "gemini",
+    model: "gemini-2.5-flash",
+    api_key: "",
+    label: ""
+  });
 
   useEffect(() => {
-    fetchSettings();
+    fetchData();
   }, []);
 
-  const fetchSettings = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get("/admin/ai-settings");
-      setSettings(response.data);
-      setFormData({
-        provider: response.data.provider || "gemini_flash_lite",
-        gemini_api_key: ""
-      });
+      const [keysRes, providersRes] = await Promise.all([
+        api.get("/admin/ai-keys"),
+        api.get("/ai-providers")
+      ]);
+      setKeys(keysRes.data);
+      setProviders(providersRes.data);
     } catch (error) {
       console.error("Failed to fetch AI settings", error);
     } finally {
@@ -679,147 +687,302 @@ const AdminAISettings = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleAddKey = async () => {
+    if (!newKey.api_key) {
+      toast.error("API key wajib diisi");
+      return;
+    }
     setSaving(true);
     try {
-      await api.put("/admin/ai-settings", {
-        provider: formData.provider,
-        gemini_api_key: formData.gemini_api_key || null
-      });
-      toast.success("AI Settings berhasil disimpan!");
-      fetchSettings();
+      await api.post("/admin/ai-keys", newKey);
+      toast.success("API key berhasil ditambahkan!");
+      setNewKey({ provider: "gemini", model: "gemini-2.5-flash", api_key: "", label: "" });
+      setShowAddForm(false);
+      fetchData();
     } catch (error) {
-      toast.error("Gagal menyimpan settings");
+      toast.error(error.response?.data?.detail || "Gagal menambahkan key");
     } finally {
       setSaving(false);
     }
   };
 
+  const toggleKey = async (keyId, currentStatus) => {
+    try {
+      await api.put(`/admin/ai-keys/${keyId}`, { is_active: !currentStatus });
+      toast.success(`Key ${!currentStatus ? 'diaktifkan' : 'dinonaktifkan'}`);
+      fetchData();
+    } catch (error) {
+      toast.error("Gagal mengubah status key");
+    }
+  };
+
+  const deleteKey = async (keyId) => {
+    if (!window.confirm("Yakin ingin menghapus key ini?")) return;
+    setDeletingId(keyId);
+    try {
+      await api.delete(`/admin/ai-keys/${keyId}`);
+      toast.success("Key berhasil dihapus");
+      fetchData();
+    } catch (error) {
+      toast.error("Gagal menghapus key");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const moveKey = async (keyId, direction) => {
+    const idx = keys.findIndex(k => k.id === keyId);
+    if ((direction === "up" && idx === 0) || (direction === "down" && idx === keys.length - 1)) return;
+    const newKeys = [...keys];
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    [newKeys[idx], newKeys[swapIdx]] = [newKeys[swapIdx], newKeys[idx]];
+    try {
+      await api.put("/admin/ai-keys/reorder", { key_ids: newKeys.map(k => k.id) });
+      fetchData();
+    } catch (error) {
+      toast.error("Gagal mengubah urutan");
+    }
+  };
+
+  const availableModels = providers[newKey.provider]?.models || {};
+
   if (loading) return <div className="p-8 text-center">Memuat...</div>;
 
   return (
     <div className="p-6 space-y-6" data-testid="admin-ai-settings">
-      <h1 className="text-2xl font-bold text-[#1E3A5F]">AI Settings</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-[#1E3A5F]">AI Settings</h1>
+        <Button 
+          onClick={() => setShowAddForm(!showAddForm)} 
+          className="bg-[#F4820A] hover:bg-[#D97008]"
+          data-testid="btn-add-key"
+        >
+          <Plus className="w-4 h-4 mr-2" /> Tambah API Key
+        </Button>
+      </div>
 
+      {/* Add Key Form */}
+      {showAddForm && (
+        <Card className="border-[#F4820A]/30 bg-orange-50/30">
+          <CardHeader>
+            <CardTitle className="text-lg">Tambah API Key Baru</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Provider</Label>
+                <Select 
+                  value={newKey.provider} 
+                  onValueChange={(v) => {
+                    const firstModel = Object.keys(providers[v]?.models || {})[0] || "";
+                    setNewKey({ ...newKey, provider: v, model: firstModel });
+                  }}
+                >
+                  <SelectTrigger data-testid="select-provider">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(providers).map(([key, p]) => (
+                      <SelectItem key={key} value={key}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Model</Label>
+                <Select value={newKey.model} onValueChange={(v) => setNewKey({ ...newKey, model: v })}>
+                  <SelectTrigger data-testid="select-model">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(availableModels).map(([key, m]) => (
+                      <SelectItem key={key} value={key}>
+                        {m.name} — ${m.input_price}/${m.output_price} per 1M token
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>API Key</Label>
+              <div className="flex gap-2">
+                <Input
+                  type={showKey ? "text" : "password"}
+                  placeholder="Masukkan API key..."
+                  value={newKey.api_key}
+                  onChange={(e) => setNewKey({ ...newKey, api_key: e.target.value })}
+                  className="font-mono"
+                  data-testid="input-api-key"
+                />
+                <Button variant="outline" onClick={() => setShowKey(!showKey)}>
+                  <Eye className="w-4 h-4" />
+                </Button>
+              </div>
+              {providers[newKey.provider]?.key_url && (
+                <p className="text-xs text-slate-500">
+                  Dapatkan key di: <a href={providers[newKey.provider].key_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{providers[newKey.provider].key_url}</a>
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Label (opsional)</Label>
+              <Input
+                placeholder="Contoh: Gemini Key Utama"
+                value={newKey.label}
+                onChange={(e) => setNewKey({ ...newKey, label: e.target.value })}
+                data-testid="input-key-label"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleAddKey} disabled={saving} className="bg-[#1E3A5F] hover:bg-[#162B47]">
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                Simpan Key
+              </Button>
+              <Button variant="outline" onClick={() => setShowAddForm(false)}>Batal</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Fallback Chain Visualization */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Bot className="w-5 h-5" />
-            Konfigurasi AI Provider
+            <Zap className="w-5 h-5 text-yellow-500" />
+            Fallback Chain (Urutan Prioritas)
           </CardTitle>
+          <p className="text-sm text-slate-500">
+            Sistem akan mencoba key dari atas ke bawah. Jika key pertama gagal, otomatis pindah ke key berikutnya.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Current Settings */}
-          <div className="p-4 bg-slate-50 rounded-xl">
-            <h3 className="font-medium mb-3">Settings Aktif</h3>
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-slate-500">Provider:</span>
-                <p className="font-medium">
-                  {settings?.provider === "gemini_pro" ? "Gemini Pro" : "Gemini Flash-Lite"}
-                </p>
-              </div>
-              <div>
-                <span className="text-slate-500">Model:</span>
-                <p className="font-medium">{settings?.model || "gemini-2.0-flash-lite"}</p>
-              </div>
-              <div>
-                <span className="text-slate-500">API Key:</span>
-                <p className="font-medium font-mono text-xs">{settings?.gemini_api_key_masked || "***"}</p>
-              </div>
+        <CardContent>
+          {keys.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>Belum ada API key. Klik "Tambah API Key" untuk memulai.</p>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {keys.map((key, idx) => {
+                const providerInfo = providers[key.provider];
+                const modelInfo = providerInfo?.models?.[key.model];
+                return (
+                  <div 
+                    key={key.id}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                      key.is_active 
+                        ? key.last_error ? "border-amber-200 bg-amber-50/50" : "border-slate-200 bg-white"
+                        : "border-slate-100 bg-slate-50 opacity-60"
+                    }`}
+                    data-testid={`ai-key-${key.id}`}
+                  >
+                    {/* Priority number */}
+                    <div className="flex flex-col items-center gap-1">
+                      <button onClick={() => moveKey(key.id, "up")} disabled={idx === 0} className="text-slate-400 hover:text-slate-600 disabled:opacity-30">
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <span className="text-lg font-bold text-[#1E3A5F] w-8 text-center">{idx + 1}</span>
+                      <button onClick={() => moveKey(key.id, "down")} disabled={idx === keys.length - 1} className="text-slate-400 hover:text-slate-600 disabled:opacity-30">
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
 
-          {/* Provider Selection */}
-          <div className="space-y-2">
-            <Label>AI Provider</Label>
-            <Select value={formData.provider} onValueChange={(v) => setFormData({ ...formData, provider: v })}>
-              <SelectTrigger data-testid="select-ai-provider">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gemini_flash_lite">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-yellow-500" />
-                    Gemini 2.0 Flash-Lite (Cepat & Hemat)
+                    {/* Key Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold truncate">{key.label}</span>
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {providerInfo?.name || key.provider}
+                        </Badge>
+                        {idx === 0 && key.is_active && (
+                          <Badge className="bg-[#F4820A] text-white text-xs shrink-0">Utama</Badge>
+                        )}
+                        {idx > 0 && key.is_active && (
+                          <Badge variant="outline" className="text-xs text-slate-500 shrink-0">Fallback</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span className="font-mono">{key.api_key_masked}</span>
+                        <span>{modelInfo?.name || key.model}</span>
+                        {modelInfo && (
+                          <span className="text-green-600 font-medium">
+                            ${modelInfo.input_price} / ${modelInfo.output_price} per 1M
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs mt-1">
+                        {key.usage_count > 0 && (
+                          <span className="text-slate-400">{key.usage_count}x dipakai</span>
+                        )}
+                        {key.last_error && (
+                          <span className="text-amber-600 truncate max-w-xs" title={key.last_error}>
+                            Error: {key.last_error}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Switch
+                        checked={key.is_active}
+                        onCheckedChange={() => toggleKey(key.id, key.is_active)}
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
+                        onClick={() => deleteKey(key.id)}
+                        disabled={deletingId === key.id}
+                      >
+                        {deletingId === key.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      </Button>
+                    </div>
                   </div>
-                </SelectItem>
-                <SelectItem value="gemini_pro">
-                  <div className="flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-blue-500" />
-                    Gemini 2.0 Pro (Kualitas Tinggi)
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-slate-500">
-              Flash-Lite: Respon cepat, cocok untuk dokumen standar. Pro: Kualitas lebih baik untuk konten kompleks.
-            </p>
-          </div>
-
-          {/* API Key */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              Gemini API Key (Opsional)
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                type={showKey ? "text" : "password"}
-                placeholder="Masukkan API key baru (kosongkan jika tidak ingin mengubah)"
-                value={formData.gemini_api_key}
-                onChange={(e) => setFormData({ ...formData, gemini_api_key: e.target.value })}
-                className="font-mono"
-                data-testid="input-gemini-key"
-              />
-              <Button variant="outline" onClick={() => setShowKey(!showKey)}>
-                <Eye className="w-4 h-4" />
-              </Button>
+                );
+              })}
             </div>
-            <p className="text-xs text-slate-500">
-              Dapatkan API key di: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Google AI Studio</a>
-            </p>
-          </div>
+          )}
+        </CardContent>
+      </Card>
 
-          {/* Provider Info */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="p-4 border border-slate-200 rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="w-5 h-5 text-yellow-500" />
-                <span className="font-medium">Flash-Lite</span>
-              </div>
-              <ul className="text-sm text-slate-600 space-y-1">
-                <li>Respon dalam 2-5 detik</li>
-                <li>Cocok untuk dokumen standar</li>
-                <li>Hemat kuota API</li>
-              </ul>
-            </div>
-            <div className="p-4 border border-slate-200 rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <Bot className="w-5 h-5 text-blue-500" />
-                <span className="font-medium">Pro</span>
-              </div>
-              <ul className="text-sm text-slate-600 space-y-1">
-                <li>Respon 5-15 detik</li>
-                <li>Kualitas output lebih detail</li>
-                <li>Cocok untuk soal kompleks</li>
-              </ul>
-            </div>
+      {/* Provider Pricing Reference */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Harga per Provider (per 1M Token)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Input</TableHead>
+                  <TableHead>Output</TableHead>
+                  <TableHead>Catatan</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(providers).map(([provKey, prov]) => 
+                  Object.entries(prov.models).map(([modelKey, model], mIdx) => (
+                    <TableRow key={modelKey}>
+                      {mIdx === 0 && (
+                        <TableCell rowSpan={Object.keys(prov.models).length} className="font-medium align-top">
+                          {prov.name}
+                        </TableCell>
+                      )}
+                      <TableCell className="text-sm">{model.name}</TableCell>
+                      <TableCell className="font-mono text-sm text-green-600">${model.input_price}</TableCell>
+                      <TableCell className="font-mono text-sm text-green-600">${model.output_price}</TableCell>
+                      <TableCell className="text-xs text-slate-500">{model.desc}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-
-          <Button onClick={handleSave} disabled={saving} className="w-full bg-[#1E3A5F] hover:bg-[#162B47]">
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Menyimpan...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Simpan Settings
-              </>
-            )}
-          </Button>
         </CardContent>
       </Card>
     </div>
