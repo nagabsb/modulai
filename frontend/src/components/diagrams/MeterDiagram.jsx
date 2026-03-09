@@ -8,6 +8,8 @@ import React from 'react';
  * @param {string} props.range - Range text like "0.5 A" or "10 V"
  */
 const MeterDiagram = ({ type = 'ammeter', needlePosition = 50, range = '1 A' }) => {
+  // Ensure range is always a string
+  const rangeStr = String(range);
   const width = 200;
   const height = 150;
   const centerX = width / 2;
@@ -145,7 +147,7 @@ const MeterDiagram = ({ type = 'ammeter', needlePosition = 50, range = '1 A' }) 
         textAnchor="middle"
         fill="#666"
       >
-        Skala: 0 - {range}
+        Skala: 0 - {rangeStr}
       </text>
       
       {/* Current reading indicator */}
@@ -156,7 +158,7 @@ const MeterDiagram = ({ type = 'ammeter', needlePosition = 50, range = '1 A' }) 
         textAnchor="middle"
         fill="#666"
       >
-        Pembacaan: {((needlePosition / 100) * parseFloat(range)).toFixed(2)} {range.split(' ')[1]}
+        Pembacaan: {((needlePosition / 100) * parseFloat(rangeStr)).toFixed(2)} {rangeStr.split(' ')[1] || ''}
       </text>
     </svg>
   );

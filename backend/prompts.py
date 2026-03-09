@@ -143,16 +143,19 @@ Buat dengan desain menarik, ada kotak isian untuk jawaban siswa (gunakan <u>&nbs
 </div>
 ... dst untuk semua soal""" if data.sertakan_pembahasan else ""
 
+        total_soal = data.jumlah_pg + data.jumlah_isian + data.jumlah_essay
+
         return f"""Buatkan Bank Soal dengan spesifikasi:
 {base_info}
 Tingkat Kesulitan: {data.tingkat_kesulitan} - {difficulty_map.get(data.tingkat_kesulitan, '')}
 
 {physics_diagram_instruction}
 
-Jumlah Soal:
-- Pilihan Ganda (PG): {data.jumlah_pg} soal
-- Isian Singkat: {data.jumlah_isian} soal
-- Essay/Uraian: {data.jumlah_essay} soal
+JUMLAH SOAL YANG HARUS DIBUAT (WAJIB TEPAT, TIDAK BOLEH KURANG):
+- Pilihan Ganda (PG): TEPAT {data.jumlah_pg} soal (nomor 1 sampai {data.jumlah_pg})
+- Isian Singkat: TEPAT {data.jumlah_isian} soal (nomor 1 sampai {data.jumlah_isian})
+- Essay/Uraian: TEPAT {data.jumlah_essay} soal (nomor 1 sampai {data.jumlah_essay})
+TOTAL: {total_soal} soal. PASTIKAN SEMUA {total_soal} SOAL DITULIS LENGKAP TANPA DISINGKAT.
 
 SANGAT PENTING - OUTPUT HARUS BERUPA HTML YANG TERSTRUKTUR DENGAN BAIK.
 Gunakan tag HTML berikut secara WAJIB:
@@ -246,14 +249,17 @@ FORMAT HTML OUTPUT HARUS PERSIS SEPERTI INI:
 
 CATATAN PENTING:
 - OUTPUT WAJIB HTML! Gunakan tag <h2>, <p>, <div>, <table>, <strong> dll
-- SEMUA SOAL harus ditulis LENGKAP terlebih dahulu
+- JUMLAH SOAL WAJIB TEPAT: {data.jumlah_pg} PG + {data.jumlah_isian} Isian + {data.jumlah_essay} Essay = {total_soal} soal total. JANGAN KURANG!
+- SEMUA {total_soal} SOAL harus ditulis LENGKAP satu per satu dari nomor 1 sampai selesai
+- JANGAN skip, JANGAN tulis "dst", JANGAN tulis "lanjutkan pola yang sama"
 - KUNCI JAWABAN ditulis SETELAH semua soal selesai
 - PEMBAHASAN (jika ada) ditulis PALING AKHIR setelah kunci jawaban
 - Setiap pilihan jawaban (A, B, C, D, E) HARUS pada baris terpisah (gunakan <p> tag)
 - Setiap soal HARUS dipisahkan dengan spacing yang cukup (gunakan <div> dengan margin-bottom)
 - Untuk rumus Matematika/Fisika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display
 - JANGAN gunakan emoji
-- JANGAN output sebagai plain text, HARUS HTML terstruktur"""
+- JANGAN output sebagai plain text, HARUS HTML terstruktur
+- Variasikan topik dan tipe soal supaya tidak monoton"""
 
     elif data.doc_type == "rubrik":
         return f"""Buatkan Rubrik Asesmen dengan format:
