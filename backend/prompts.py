@@ -134,6 +134,12 @@ Buat dengan desain menarik, ada kotak isian untuk jawaban siswa (gunakan <u>&nbs
             "Campuran": "C1-C6 (bervariasi)"
         }
 
+        # Handle chunked soal generation
+        if data.soal_section == "pg":
+            return _build_pg_chunk_prompt(data, base_info, difficulty_map, physics_diagram_instruction)
+        elif data.soal_section == "non_pg":
+            return _build_non_pg_chunk_prompt(data, base_info, difficulty_map)
+
         pembahasan_instruction = """
 <h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">PEMBAHASAN</h2>
 <p><em>(Untuk setiap soal, berikan penjelasan detail dengan rumus dan langkah penyelesaian)</em></p>
@@ -280,3 +286,125 @@ Struktur Rubrik:
 Format: HTML dengan tabel rubrik yang jelas. Header tabel: background #1E3A5F, teks putih. JANGAN gunakan emoji."""
 
     return f"Buatkan dokumen pendidikan tentang: {data.topik}"
+
+
+def _build_pg_chunk_prompt(data, base_info, difficulty_map, physics_diagram_instruction):
+    """Build prompt for a PG-only chunk (used for chunked large soal generation)"""
+    start_num = data.pg_numbering_start
+    count = data.jumlah_pg
+    end_num = start_num + count - 1
+
+    return f"""Buatkan HANYA soal Pilihan Ganda dengan spesifikasi:
+{base_info}
+Tingkat Kesulitan: {data.tingkat_kesulitan} - {difficulty_map.get(data.tingkat_kesulitan, '')}
+
+{physics_diagram_instruction}
+
+INSTRUKSI: Buat TEPAT {count} soal Pilihan Ganda, dinomori dari {start_num} sampai {end_num}.
+
+OUTPUT HANYA berisi soal PG dan kunci jawaban PG. JANGAN buat soal isian atau essay.
+
+Format setiap soal WAJIB seperti ini:
+<div style="margin-bottom:20px;">
+<p><strong>{start_num}.</strong> [Teks soal lengkap]</p>
+<div style="margin-left:30px;">
+<p>A. [Pilihan A]</p>
+<p>B. [Pilihan B]</p>
+<p>C. [Pilihan C]</p>
+<p>D. [Pilihan D]</p>
+<p>E. [Pilihan E]</p>
+</div>
+</div>
+
+Setelah semua {count} soal, tulis kunci jawaban:
+<h3 style="margin-top:20px;"><strong>Kunci Jawaban PG No. {start_num}-{end_num}:</strong></h3>
+<table style="width:100%;border-collapse:collapse;margin:15px 0;">
+<tr style="background-color:#1E3A5F;color:white;">
+<th style="padding:8px;border:1px solid #ccc;">No</th>
+<th style="padding:8px;border:1px solid #ccc;">Jawaban</th>
+</tr>
+(satu baris per soal)
+</table>
+
+Untuk rumus matematika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display.
+
+CATATAN PENTING:
+- WAJIB TEPAT {count} soal PG dari nomor {start_num} sampai {end_num}
+- JANGAN kurang, JANGAN skip, JANGAN tulis "dst"
+- SETIAP soal harus ditulis LENGKAP
+- Setiap pilihan jawaban (A-E) HARUS pada baris terpisah
+- Output WAJIB HTML terstruktur
+- JANGAN gunakan emoji
+- Variasikan topik dan tipe soal"""
+
+
+def _build_non_pg_chunk_prompt(data, base_info, difficulty_map):
+    """Build prompt for non-PG section (isian + essay + pembahasan)"""
+    pembahasan_instruction = ""
+    if data.sertakan_pembahasan:
+        pembahasan_instruction = """
+Setelah kunci jawaban, tambahkan PEMBAHASAN DETAIL:
+<h3 style="margin-top:20px;"><strong>Pembahasan Isian Singkat:</strong></h3>
+<div style="margin-left:10px;">
+(Pembahasan untuk setiap soal isian)
+</div>
+
+<h3 style="margin-top:20px;"><strong>Pembahasan Essay:</strong></h3>
+<div style="margin-left:10px;">
+(Pembahasan untuk setiap soal essay)
+</div>
+"""
+
+    sections = []
+    if data.jumlah_isian > 0:
+        sections.append(f"""
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">II. SOAL ISIAN SINGKAT</h2>
+Buat TEPAT {data.jumlah_isian} soal isian singkat (nomor 1 sampai {data.jumlah_isian}).
+Format:
+<div style="margin-bottom:15px;">
+<p><strong>1.</strong> [Teks soal isian] _______________</p>
+</div>
+""")
+
+    if data.jumlah_essay > 0:
+        sections.append(f"""
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">III. SOAL ESSAY/URAIAN</h2>
+Buat TEPAT {data.jumlah_essay} soal essay (nomor 1 sampai {data.jumlah_essay}).
+Format:
+<div style="margin-bottom:20px;">
+<p><strong>1.</strong> [Teks soal essay lengkap]</p>
+</div>
+""")
+
+    section_text = "\n".join(sections)
+
+    return f"""Buatkan soal Isian Singkat dan Essay dengan spesifikasi:
+{base_info}
+Tingkat Kesulitan: {data.tingkat_kesulitan} - {difficulty_map.get(data.tingkat_kesulitan, '')}
+
+INSTRUKSI: Buat HANYA soal Isian Singkat dan Essay. JANGAN buat soal Pilihan Ganda.
+
+{section_text}
+
+Setelah semua soal, tulis kunci jawaban:
+<hr style="border:2px solid #1E3A5F;margin:30px 0;">
+<h3 style="margin-top:20px;"><strong>Kunci Jawaban Isian Singkat:</strong></h3>
+<div style="margin-left:10px;">
+(Jawaban untuk setiap soal isian)
+</div>
+
+<h3 style="margin-top:20px;"><strong>Kunci Jawaban Essay:</strong></h3>
+<div style="margin-left:10px;">
+(Jawaban lengkap untuk setiap soal essay)
+</div>
+
+{pembahasan_instruction}
+
+Untuk rumus matematika, gunakan LaTeX: $formula$ untuk inline atau $$formula$$ untuk display.
+
+CATATAN PENTING:
+- JUMLAH SOAL WAJIB TEPAT: {data.jumlah_isian} Isian + {data.jumlah_essay} Essay
+- JANGAN buat soal PG
+- JANGAN kurang, JANGAN skip
+- Output WAJIB HTML terstruktur
+- JANGAN gunakan emoji"""

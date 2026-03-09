@@ -12,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { toast } from "sonner";
 import api from "../utils/api";
 import { exportToExcel, exportMultipleToExcel } from "../utils/exportExcel";
+import { exportToWord } from "../utils/exportWord";
+import { exportToPdf } from "../utils/exportPdf";
 import { parseDiagramsInContent, hasDiagrams } from "../utils/diagramParser";
 import { processGeneratedContent } from "../utils/latexRenderer";
 import { 
@@ -38,6 +40,7 @@ import {
   PenTool,
   Award,
   FileSpreadsheet,
+  FileDown,
   Zap,
   Layers
 } from "lucide-react";
@@ -121,6 +124,8 @@ const Generate = () => {
     return 1;
   };
 
+  const SOAL_CHUNK_SIZE = 15;
+
   const handleGenerate = async () => {
     if (!formData.topik.trim()) {
       toast.error("Mohon isi topik/materi pembelajaran");
@@ -160,7 +165,14 @@ const Generate = () => {
             voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
           };
 
-          const response = await api.post("/generate", requestData, { timeout: 180000 });
+          // Use chunked generation for soal with many PG
+          let response;
+          if (docType === "soal" && formData.jumlah_pg > SOAL_CHUNK_SIZE) {
+            response = { data: await generateSoalChunked(requestData) };
+          } else {
+            response = await api.post("/generate", requestData, { timeout: 180000 });
+          }
+
           results.push({
             id: response.data.id,
             doc_type: docType,
@@ -182,7 +194,6 @@ const Generate = () => {
       } else {
         // Single document generation
         const docType = isMultiMode ? selectedDocTypes[0] : formData.doc_type;
-        setGeneratingProgress(`Membuat ${DOC_TYPE_LABELS[docType]}...`);
         const requestData = {
           ...formData,
           doc_type: docType,
@@ -190,8 +201,16 @@ const Generate = () => {
           resistor2: formData.use_custom_values && formData.resistor2 ? parseFloat(formData.resistor2) : null,
           voltage: formData.use_custom_values && formData.voltage ? parseFloat(formData.voltage) : null,
         };
-        
-        const response = await api.post("/generate", requestData, { timeout: 180000 });
+
+        let response;
+        if (docType === "soal" && formData.jumlah_pg > SOAL_CHUNK_SIZE) {
+          // Chunked generation for large PG sets
+          response = { data: await generateSoalChunked(requestData) };
+        } else {
+          setGeneratingProgress(`Membuat ${DOC_TYPE_LABELS[docType]}...`);
+          response = await api.post("/generate", requestData, { timeout: 180000 });
+        }
+
         setResult(response.data);
         await refreshUser();
         setStep(3);
@@ -201,12 +220,91 @@ const Generate = () => {
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         toast.error("Proses terlalu lama. Cek di menu Riwayat, dokumen mungkin sudah tersimpan.");
       } else {
-        toast.error(error.response?.data?.detail || "Gagal generate dokumen. Coba lagi.");
+        toast.error(error.response?.data?.detail || error.message || "Gagal generate dokumen. Coba lagi.");
       }
     } finally {
       setLoading(false);
       setGeneratingProgress("");
     }
+  };
+
+  const generateSoalChunked = async (requestData) => {
+    const totalPg = requestData.jumlah_pg;
+    const pgChunks = [];
+    for (let i = 0; i < totalPg; i += SOAL_CHUNK_SIZE) {
+      pgChunks.push({
+        start: i + 1,
+        count: Math.min(SOAL_CHUNK_SIZE, totalPg - i)
+      });
+    }
+
+    let mergedHtml = `<h2 style="background-color:#1E3A5F;color:white;padding:10px;text-align:center;">BANK SOAL ${requestData.mata_pelajaran.toUpperCase()}</h2>
+<p style="text-align:center;"><strong>Kelas ${requestData.kelas} ${requestData.jenjang} | ${requestData.kurikulum} | Semester ${requestData.semester}</strong></p>
+<h2 style="background-color:#1E3A5F;color:white;padding:10px;margin-top:30px;">I. SOAL PILIHAN GANDA</h2>`;
+
+    let allKunci = '';
+    const totalChunks = pgChunks.length + (requestData.jumlah_isian > 0 || requestData.jumlah_essay > 0 ? 1 : 0);
+    let currentStep = 0;
+
+    // Generate PG chunks
+    for (const chunk of pgChunks) {
+      currentStep++;
+      const endNum = chunk.start + chunk.count - 1;
+      setGeneratingProgress(`Membuat soal PG ${chunk.start}-${endNum} (${currentStep}/${totalChunks})...`);
+
+      const chunkResp = await api.post("/generate", {
+        ...requestData,
+        soal_section: "pg",
+        pg_numbering_start: chunk.start,
+        jumlah_pg: chunk.count,
+        jumlah_isian: 0,
+        jumlah_essay: 0,
+        sertakan_pembahasan: false,
+        is_chunk: true,
+      }, { timeout: 180000 });
+
+      const chunkHtml = chunkResp.data.result_html;
+      // Extract questions and kunci from chunk
+      const kunciIdx = chunkHtml.indexOf('<h3');
+      if (kunciIdx > -1) {
+        mergedHtml += '\n' + chunkHtml.substring(0, kunciIdx);
+        allKunci += '\n' + chunkHtml.substring(kunciIdx);
+      } else {
+        mergedHtml += '\n' + chunkHtml;
+      }
+    }
+
+    // Generate non-PG section (isian + essay)
+    if (requestData.jumlah_isian > 0 || requestData.jumlah_essay > 0) {
+      currentStep++;
+      setGeneratingProgress(`Membuat soal isian & essay (${currentStep}/${totalChunks})...`);
+
+      const nonPgResp = await api.post("/generate", {
+        ...requestData,
+        soal_section: "non_pg",
+        jumlah_pg: 0,
+        is_chunk: true,
+      }, { timeout: 180000 });
+
+      mergedHtml += '\n' + nonPgResp.data.result_html;
+    }
+
+    // Add all kunci jawaban at the end
+    if (allKunci) {
+      mergedHtml += '\n<hr style="border:2px solid #1E3A5F;margin:30px 0;">';
+      mergedHtml += '\n<h2 style="background-color:#1E3A5F;color:white;padding:10px;">KUNCI JAWABAN</h2>';
+      mergedHtml += allKunci;
+    }
+
+    // Save merged result and deduct token
+    setGeneratingProgress("Menyimpan hasil...");
+    const saveResp = await api.post("/generate/save", {
+      doc_type: "soal",
+      form_data: requestData,
+      result_html: mergedHtml,
+    }, { timeout: 30000 });
+
+    return saveResp.data;
   };
 
   const handlePrint = (html, docType, topik) => {
@@ -257,6 +355,30 @@ const Generate = () => {
       toast.success("File Excel berhasil didownload!");
     } catch (error) {
       toast.error("Gagal export ke Excel");
+      console.error(error);
+    }
+  };
+
+  const handleExportWord = (html, docType) => {
+    try {
+      const filename = `${DOC_TYPE_LABELS[docType]}_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
+      const title = `${DOC_TYPE_LABELS[docType]} - ${formData.topik}`;
+      exportToWord(html, filename, title);
+      toast.success("File Word berhasil didownload!");
+    } catch (error) {
+      toast.error("Gagal export ke Word");
+      console.error(error);
+    }
+  };
+
+  const handleExportPdf = async (html, docType) => {
+    try {
+      toast.info("Menyiapkan PDF...");
+      const filename = `${DOC_TYPE_LABELS[docType]}_${formData.mata_pelajaran}_Kelas${formData.kelas}`.replace(/\s+/g, '_');
+      await exportToPdf(html, filename);
+      toast.success("File PDF berhasil didownload!");
+    } catch (error) {
+      toast.error("Gagal export ke PDF");
       console.error(error);
     }
   };
@@ -763,7 +885,15 @@ const Generate = () => {
               <Card>
                 <CardHeader className="border-b flex flex-row items-center justify-between">
                   <CardTitle>{DOC_TYPE_LABELS[formData.doc_type]}: {formData.topik}</CardTitle>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleExportWord(result.result_html, formData.doc_type)} data-testid="btn-export-word">
+                      <FileDown className="w-4 h-4 mr-1" />
+                      Word
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleExportPdf(result.result_html, formData.doc_type)} data-testid="btn-export-pdf">
+                      <FileText className="w-4 h-4 mr-1" />
+                      PDF
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => handleExportExcel(result.result_html, formData.doc_type)}>
                       <FileSpreadsheet className="w-4 h-4 mr-1" />
                       Excel
@@ -803,7 +933,15 @@ const Generate = () => {
                       <TabsContent key={r.doc_type} value={r.doc_type} className="p-0 m-0">
                         <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
                           <h3 className="font-semibold">{DOC_TYPE_LABELS[r.doc_type]}: {formData.topik}</h3>
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleExportWord(r.result_html, r.doc_type)} data-testid={`btn-export-word-${r.doc_type}`}>
+                              <FileDown className="w-4 h-4 mr-1" />
+                              Word
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleExportPdf(r.result_html, r.doc_type)} data-testid={`btn-export-pdf-${r.doc_type}`}>
+                              <FileText className="w-4 h-4 mr-1" />
+                              PDF
+                            </Button>
                             <Button variant="outline" size="sm" onClick={() => handleExportExcel(r.result_html, r.doc_type)}>
                               <FileSpreadsheet className="w-4 h-4 mr-1" />
                               Excel

@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Badge } from "../components/ui/badge";
 import api from "../utils/api";
 import { exportToExcel } from "../utils/exportExcel";
+import { exportToWord } from "../utils/exportWord";
+import { exportToPdf } from "../utils/exportPdf";
 import { parseDiagramsInContent, hasDiagrams } from "../utils/diagramParser";
 import { processGeneratedContent } from "../utils/latexRenderer";
 import { DOC_TYPE_LABELS, formatDate } from "../utils/constants";
@@ -17,7 +19,8 @@ import {
   Calendar,
   BookOpen,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileDown
 } from "lucide-react";
 
 const HistoryDetail = () => {
@@ -71,6 +74,25 @@ const HistoryDetail = () => {
       exportToExcel(generation.result_html, filename, generation.doc_type);
     } catch (error) {
       console.error("Export failed", error);
+    }
+  };
+
+  const handleExportWord = () => {
+    try {
+      const filename = `${DOC_TYPE_LABELS[generation.doc_type]}_${generation.form_data?.mata_pelajaran}_Kelas${generation.form_data?.kelas}`.replace(/\s+/g, '_');
+      const title = `${DOC_TYPE_LABELS[generation.doc_type]} - ${generation.form_data?.topik}`;
+      exportToWord(generation.result_html, filename, title);
+    } catch (error) {
+      console.error("Word export failed", error);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const filename = `${DOC_TYPE_LABELS[generation.doc_type]}_${generation.form_data?.mata_pelajaran}_Kelas${generation.form_data?.kelas}`.replace(/\s+/g, '_');
+      await exportToPdf(generation.result_html, filename);
+    } catch (error) {
+      console.error("PDF export failed", error);
     }
   };
 
@@ -141,9 +163,17 @@ const HistoryDetail = () => {
               <RefreshCw className="w-4 h-4 mr-2" />
               Buat Ulang
             </Button>
+            <Button variant="outline" onClick={handleExportWord} data-testid="btn-export-word-detail">
+              <FileDown className="w-4 h-4 mr-2" />
+              Word
+            </Button>
+            <Button variant="outline" onClick={handleExportPdf} data-testid="btn-export-pdf-detail">
+              <FileText className="w-4 h-4 mr-2" />
+              PDF
+            </Button>
             <Button variant="outline" onClick={handleExportExcel} data-testid="btn-export-excel-detail">
               <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Export Excel
+              Excel
             </Button>
             <Button variant="outline" onClick={handlePrint} data-testid="btn-print-detail">
               <Printer className="w-4 h-4 mr-2" />

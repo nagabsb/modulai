@@ -53,6 +53,16 @@ class GenerateRequest(BaseModel):
     resistor1: Optional[float] = None
     resistor2: Optional[float] = None
     voltage: Optional[float] = None
+    # Chunked soal generation
+    soal_section: Optional[str] = None  # "pg", "non_pg", None=all
+    pg_numbering_start: Optional[int] = 1
+    is_chunk: Optional[bool] = False  # If True, no token deduction, no save
+
+
+class SaveGenerationRequest(BaseModel):
+    doc_type: str
+    form_data: dict
+    result_html: str
 
 
 class MultiGenerateRequest(BaseModel):

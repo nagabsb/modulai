@@ -8,7 +8,7 @@ import logging
 from database import db
 from config import GEMINI_API_KEY, TOKEN_PACKAGES, AI_PROVIDERS
 from auth import get_current_user
-from models import GenerateRequest, MultiGenerateRequest
+from models import GenerateRequest, MultiGenerateRequest, SaveGenerationRequest
 from prompts import build_prompt
 
 logger = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ async def call_openai(api_key: str, model: str, prompt: str) -> str:
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
+        "max_completion_tokens": 16384,
     }
     async with httpx.AsyncClient(timeout=180.0) as client:
         response = await client.post(url, json=payload, headers=headers)
@@ -169,14 +170,20 @@ async def get_ai_providers_info():
 
 @router.post("/generate")
 async def generate_document(data: GenerateRequest, user: dict = Depends(get_current_user)):
-    if user["token_balance"] < 1:
-        raise HTTPException(status_code=402, detail="Token tidak mencukupi. Silakan top up.")
+    # For chunk calls, skip token check/deduction
+    if not data.is_chunk:
+        if user["token_balance"] < 1:
+            raise HTTPException(status_code=402, detail="Token tidak mencukupi. Silakan top up.")
 
     prompt = build_prompt(data)
     result_html = await generate_with_ai(prompt)
 
     result_html = re.sub(r'^```html?\n?', '', result_html)
     result_html = re.sub(r'\n?```$', '', result_html)
+
+    # For chunk calls, return only HTML without saving or deducting tokens
+    if data.is_chunk:
+        return {"result_html": result_html}
 
     generation_id = str(uuid.uuid4())
     generation = {
@@ -201,6 +208,40 @@ async def generate_document(data: GenerateRequest, user: dict = Depends(get_curr
         "tokens_used": 1,
         "remaining_tokens": user["token_balance"] - 1
     }
+
+
+@router.post("/generate/save")
+async def save_chunked_generation(data: SaveGenerationRequest, user: dict = Depends(get_current_user)):
+    """Save a merged chunked generation result and deduct 1 token"""
+    if user["token_balance"] < 1:
+        raise HTTPException(status_code=402, detail="Token tidak mencukupi. Silakan top up.")
+
+    generation_id = str(uuid.uuid4())
+    generation = {
+        "id": generation_id,
+        "user_id": user["id"],
+        "doc_type": data.doc_type,
+        "form_data": data.form_data,
+        "result_html": data.result_html,
+        "tokens_used": 1,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.generations.insert_one(generation)
+
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$inc": {"token_balance": -1}}
+    )
+
+    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+
+    return {
+        "id": generation_id,
+        "result_html": data.result_html,
+        "tokens_used": 1,
+        "remaining_tokens": updated_user["token_balance"]
+    }
+
 
 
 @router.get("/generations")
