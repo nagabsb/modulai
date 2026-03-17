@@ -278,6 +278,46 @@ async def admin_delete_voucher(voucher_id: str, admin: dict = Depends(get_admin_
     return {"message": "Voucher berhasil dihapus"}
 
 
+# --- Delete endpoints for Users, Generations, Transactions ---
+
+@router.delete("/users/{user_id}")
+async def admin_delete_user(user_id: str, admin: dict = Depends(get_admin_user)):
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    if user.get("role") == "super_admin":
+        raise HTTPException(status_code=403, detail="Tidak bisa menghapus super admin")
+
+    # Delete user and related data
+    await db.generations.delete_many({"user_id": user_id})
+    await db.transactions.delete_many({"user_id": user_id})
+    await db.users.delete_one({"id": user_id})
+
+    return {"message": "User dan semua data terkait berhasil dihapus"}
+
+
+@router.delete("/generations/{generation_id}")
+async def admin_delete_generation(generation_id: str, admin: dict = Depends(get_admin_user)):
+    result = await db.generations.delete_one({"id": generation_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Generasi tidak ditemukan")
+    return {"message": "Generasi berhasil dihapus"}
+
+
+@router.delete("/generations")
+async def admin_delete_all_generations(admin: dict = Depends(get_admin_user)):
+    result = await db.generations.delete_many({})
+    return {"message": f"{result.deleted_count} generasi berhasil dihapus"}
+
+
+@router.delete("/transactions/{transaction_id}")
+async def admin_delete_transaction(transaction_id: str, admin: dict = Depends(get_admin_user)):
+    result = await db.transactions.delete_one({"id": transaction_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    return {"message": "Transaksi berhasil dihapus"}
+
+
 
 @router.put("/transactions/{transaction_id}/verify")
 async def admin_verify_transaction(transaction_id: str, admin: dict = Depends(get_admin_user)):
