@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import uuid
 import re
 import httpx
 import logging
+import asyncio
 
 from database import db
 from config import GEMINI_API_KEY, TOKEN_PACKAGES, AI_PROVIDERS
@@ -170,12 +171,100 @@ async def get_ai_providers_info():
     return AI_PROVIDERS
 
 
+# Long-running document types that need async generation
+ASYNC_DOC_TYPES = {"modul", "rpp"}
+
+
+async def process_generation_task(task_id: str, data_dict: dict, user_id: str):
+    """Background task to generate document and store result"""
+    try:
+        data = GenerateRequest(**data_dict)
+        prompt = build_prompt(data)
+        result_html = await generate_with_ai(prompt)
+
+        result_html = re.sub(r'^```html?\n?', '', result_html)
+        result_html = re.sub(r'\n?```$', '', result_html)
+
+        generation_id = str(uuid.uuid4())
+        generation = {
+            "id": generation_id,
+            "user_id": user_id,
+            "doc_type": data.doc_type,
+            "form_data": data.model_dump(),
+            "result_html": result_html,
+            "tokens_used": 1,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.generations.insert_one(generation)
+
+        await db.users.update_one(
+            {"id": user_id},
+            {"$inc": {"token_balance": -1}}
+        )
+
+        updated_user = await db.users.find_one({"id": user_id}, {"_id": 0})
+
+        await db.tasks.update_one(
+            {"id": task_id},
+            {"$set": {
+                "status": "completed",
+                "result": {
+                    "id": generation_id,
+                    "result_html": result_html,
+                    "tokens_used": 1,
+                    "remaining_tokens": updated_user["token_balance"]
+                },
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+    except Exception as e:
+        logger.error(f"Background generation failed for task {task_id}: {e}")
+        await db.tasks.update_one(
+            {"id": task_id},
+            {"$set": {"status": "failed", "error": str(e)[:500]}}
+        )
+
+
+@router.get("/generate/status/{task_id}")
+async def get_generation_status(task_id: str, user: dict = Depends(get_current_user)):
+    """Poll for async generation result"""
+    task = await db.tasks.find_one({"id": task_id, "user_id": user["id"]}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task tidak ditemukan")
+
+    if task["status"] == "completed":
+        # Clean up task after delivering result
+        await db.tasks.delete_one({"id": task_id})
+        return {"status": "completed", "result": task["result"]}
+    elif task["status"] == "failed":
+        await db.tasks.delete_one({"id": task_id})
+        raise HTTPException(status_code=500, detail=task.get("error", "Generasi gagal"))
+
+    return {"status": "processing"}
+
+
 @router.post("/generate")
 async def generate_document(data: GenerateRequest, user: dict = Depends(get_current_user)):
     # For chunk calls, skip token check/deduction
     if not data.is_chunk:
         if user["token_balance"] < 1:
             raise HTTPException(status_code=402, detail="Token tidak mencukupi. Silakan top up.")
+
+    # For long-running doc types (modul, rpp), use async background task
+    if data.doc_type in ASYNC_DOC_TYPES and not data.is_chunk:
+        task_id = str(uuid.uuid4())
+        task = {
+            "id": task_id,
+            "user_id": user["id"],
+            "status": "processing",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.tasks.insert_one(task)
+
+        # Start background task
+        asyncio.create_task(process_generation_task(task_id, data.model_dump(), user["id"]))
+
+        return {"task_id": task_id, "status": "processing"}
 
     prompt = build_prompt(data)
     result_html = await generate_with_ai(prompt)

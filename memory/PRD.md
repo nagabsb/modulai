@@ -25,6 +25,9 @@
 - [x] SVG Physics Diagrams
 - [x] No maxOutputTokens limit
 - [x] **Chunked soal generation** for large question sets (>15 PG)
+- [x] **Async generation** for modul ajar & RPP (polling-based, avoids 60s proxy timeout)
+- [x] **Modul Ajar prompt**: CP (1 narasi), TP (min 3, format ABCD), ATP (urutan linier), Pertanyaan Pemantik, PPP dimensi spesifik
+- [x] **RPP prompt split**: Merdeka (CP/TP/ATP/PPP) vs K13 (KI/KD/Indikator/5M Saintifik)
 - [x] **Export: Excel** (.xlsx via @redoper1/xlsx-js-style)
 - [x] **Export: Word (.docx)** — Backend python-docx with OMML native math equations
 - [x] **Export: PDF** (html2pdf.js + KaTeX pre-rendering)

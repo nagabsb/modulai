@@ -52,32 +52,71 @@ Tag diagram WAJIB ada untuk setiap soal yang relevan dengan topik di atas.
 """
 
     if data.doc_type == "modul":
-        return f"""Buatkan Modul Ajar lengkap dengan format berikut:
+        return f"""Buatkan Modul Ajar Kurikulum Merdeka yang LENGKAP dan DETAIL dengan format berikut:
 {base_info}
 
 Struktur Modul Ajar:
+
 1. INFORMASI UMUM
-   - Identitas Modul
-   - Kompetensi Awal
-   - Profil Pelajar Pancasila
-   - Sarana Prasarana
-   - Target Peserta Didik
-   - Model Pembelajaran
+   - Identitas Modul (satuan pendidikan, mata pelajaran, kelas/fase, semester, alokasi waktu, penyusun)
+   - Kompetensi Awal (pengetahuan/keterampilan prasyarat yang harus dimiliki peserta didik)
+   - Profil Pelajar Pancasila: Sebutkan MINIMAL 2 dimensi spesifik yang dikembangkan beserta penjelasannya (pilih dari: Beriman/Bertakwa, Berkebhinekaan Global, Bergotong Royong, Mandiri, Bernalar Kritis, Kreatif)
+   - Sarana Prasarana (alat, bahan, media yang dibutuhkan)
+   - Target Peserta Didik (reguler, peserta didik dengan kesulitan belajar, peserta didik dengan pencapaian tinggi)
+   - Model Pembelajaran (PBL/Discovery Learning/Project Based Learning/dll, jelaskan alasan pemilihan)
 
 2. KOMPONEN INTI
-   - Capaian Pembelajaran (CP)
-   - Tujuan Pembelajaran (TP)
-   - Alur Tujuan Pembelajaran (ATP)
-   - Pemahaman Bermakna
-   - Pertanyaan Pemantik
-   - Kegiatan Pembelajaran (Pendahuluan, Inti, Penutup)
-   - Asesmen (Diagnostik, Formatif, Sumatif)
-   - Pengayaan dan Remedial
+
+   a. Capaian Pembelajaran (CP):
+      Tulis 1 narasi CP sesuai standar BSKAP untuk Fase {data.fase} mata pelajaran {data.mata_pelajaran}.
+      CP berupa paragraf utuh yang mendeskripsikan kompetensi yang harus dicapai di akhir fase.
+
+   b. Tujuan Pembelajaran (TP):
+      Rumuskan MINIMAL 3 Tujuan Pembelajaran yang diturunkan dari CP di atas.
+      Setiap TP harus menggunakan format ABCD:
+      - A (Audience): Peserta didik
+      - B (Behavior): Kata kerja operasional spesifik (mengidentifikasi, menganalisis, menerapkan, dll.)
+      - C (Condition): Kondisi/cara pencapaian
+      - D (Degree): Tingkat keberhasilan yang diharapkan
+
+      Format penulisan:
+      TP 1: [TP paling sederhana/dasar - level mengingat/memahami]
+      TP 2: [TP menengah - level menerapkan/menganalisis]
+      TP 3: [TP paling kompleks - level mengevaluasi/mencipta]
+      (Tambahkan TP 4, TP 5 jika topik memerlukan)
+
+   c. Alur Tujuan Pembelajaran (ATP):
+      Susun urutan linier dari semua TP di atas, dari yang paling sederhana menuju paling kompleks.
+      Tampilkan dalam bentuk tabel/diagram alur:
+      TP 1 (dasar) --> TP 2 (menengah) --> TP 3 (kompleks) --> Menuju CP
+
+      Jelaskan mengapa urutan ini dipilih dan bagaimana setiap TP membangun fondasi untuk TP berikutnya.
+
+   d. Pemahaman Bermakna:
+      Tuliskan konsep-konsep kunci yang akan dipahami peserta didik secara mendalam.
+
+   e. Pertanyaan Pemantik:
+      Tuliskan 2-3 pertanyaan terbuka yang memicu rasa ingin tahu dan berpikir kritis peserta didik.
+
+   f. Kegiatan Pembelajaran:
+      Rinci per pertemuan (sesuaikan dengan alokasi waktu {data.alokasi_waktu} menit):
+      - Pendahuluan ({int(data.alokasi_waktu * 0.15)} menit): Apersepsi, motivasi, penyampaian TP
+      - Kegiatan Inti ({int(data.alokasi_waktu * 0.7)} menit): Langkah-langkah detail sesuai model pembelajaran yang dipilih
+      - Penutup ({int(data.alokasi_waktu * 0.15)} menit): Refleksi, kesimpulan, tindak lanjut
+
+   g. Asesmen:
+      - Diagnostik: Asesmen awal untuk mengidentifikasi kesiapan belajar peserta didik (berikan contoh soal/instrumen)
+      - Formatif: Asesmen selama proses pembelajaran (observasi, tugas, kuis - berikan contoh instrumen)
+      - Sumatif: Asesmen akhir untuk mengukur pencapaian TP (berikan contoh soal/rubrik)
+
+   h. Pengayaan dan Remedial:
+      - Pengayaan: Kegiatan untuk peserta didik yang sudah mencapai TP
+      - Remedial: Kegiatan untuk peserta didik yang belum mencapai TP
 
 3. LAMPIRAN
-   - Lembar Kerja Peserta Didik
-   - Bahan Bacaan
-   - Glosarium
+   - Lembar Kerja Peserta Didik (LKPD) dengan instruksi dan ruang jawaban
+   - Bahan Bacaan ringkas
+   - Glosarium istilah penting
 
 4. DAFTAR PUSTAKA
    Wajib sertakan referensi resmi berikut (sesuaikan dengan mata pelajaran dan jenjang):
@@ -86,27 +125,151 @@ Struktur Modul Ajar:
    - Pusat Perbukuan. (2024). Buku Panduan Guru {data.mata_pelajaran} Kelas {data.kelas} {data.jenjang}. Jakarta: Kemendikdasmen. Tersedia di: buku.kemendikdasmen.go.id
    - Tambahkan 2-3 sumber relevan lainnya (buku teks, jurnal pendidikan, atau sumber resmi pemerintah)
 
-Format output: HTML dengan tabel berformat (header #1E3A5F, teks putih). Gunakan LaTeX untuk rumus matematika ($formula$ untuk inline, $$formula$$ untuk block). JANGAN gunakan emoji."""
+CATATAN PENTING:
+- TP WAJIB minimal 3, masing-masing dengan format ABCD yang jelas
+- ATP WAJIB menunjukkan urutan linier dari semua TP
+- Setiap bagian harus DETAIL dan LENGKAP, bukan hanya judul/label
+- Format output: HTML dengan tabel berformat (header #1E3A5F, teks putih). Gunakan LaTeX untuk rumus matematika ($formula$ untuk inline, $$formula$$ untuk block). JANGAN gunakan emoji."""
 
     elif data.doc_type == "rpp":
-        return f"""Buatkan RPP (Rencana Pelaksanaan Pembelajaran) dengan format:
+        if data.kurikulum.lower() in ["merdeka", "kurikulum merdeka"]:
+            return f"""Buatkan RPP (Rencana Pelaksanaan Pembelajaran) format Kurikulum Merdeka dengan format:
 {base_info}
 
-Struktur RPP:
-1. Identitas RPP
-2. Kompetensi Inti (KI) / Capaian Pembelajaran (CP)
-3. Kompetensi Dasar (KD) / Tujuan Pembelajaran (TP)
-4. Indikator Pencapaian Kompetensi
-5. Materi Pembelajaran
-6. Metode Pembelajaran
-7. Kegiatan Pembelajaran:
-   - Pendahuluan ({int(data.alokasi_waktu * 0.15)} menit)
-   - Inti ({int(data.alokasi_waktu * 0.7)} menit)
-   - Penutup ({int(data.alokasi_waktu * 0.15)} menit)
-8. Penilaian
-9. Sumber dan Media Pembelajaran
+Struktur RPP Kurikulum Merdeka:
 
-Format output: HTML dengan tabel berformat (header #1E3A5F, teks putih). JANGAN gunakan emoji."""
+1. IDENTITAS
+   - Satuan Pendidikan, Mata Pelajaran, Kelas/Semester, Fase, Materi Pokok, Alokasi Waktu: {data.alokasi_waktu} menit
+
+2. CAPAIAN PEMBELAJARAN (CP)
+   Tulis 1 narasi CP sesuai standar BSKAP untuk Fase {data.fase} mata pelajaran {data.mata_pelajaran}.
+   CP berupa paragraf utuh yang mendeskripsikan kompetensi akhir fase.
+
+3. TUJUAN PEMBELAJARAN (TP)
+   Rumuskan MINIMAL 3 Tujuan Pembelajaran dari CP dengan format ABCD:
+   - A (Audience): Peserta didik
+   - B (Behavior): Kata kerja operasional spesifik
+   - C (Condition): Kondisi/cara pencapaian
+   - D (Degree): Tingkat keberhasilan
+
+   TP 1: [Level dasar - mengingat/memahami]
+   TP 2: [Level menengah - menerapkan/menganalisis]
+   TP 3: [Level tinggi - mengevaluasi/mencipta]
+
+4. ALUR TUJUAN PEMBELAJARAN (ATP)
+   Susun urutan linier: TP 1 --> TP 2 --> TP 3 --> Menuju CP
+   Jelaskan progres dari sederhana ke kompleks.
+
+5. PROFIL PELAJAR PANCASILA
+   Sebutkan minimal 2 dimensi yang dikembangkan beserta implementasinya dalam pembelajaran.
+
+6. MATERI PEMBELAJARAN
+   Uraikan materi pokok: fakta, konsep, prinsip, dan prosedur.
+
+7. MODEL DAN METODE PEMBELAJARAN
+   - Model: (PBL/Discovery/Project Based/dll.)
+   - Metode: (Diskusi, Tanya Jawab, Presentasi, Praktik, dll.)
+
+8. KEGIATAN PEMBELAJARAN
+   a. Pendahuluan ({int(data.alokasi_waktu * 0.15)} menit):
+      - Salam, doa, presensi
+      - Apersepsi (mengaitkan materi sebelumnya)
+      - Motivasi dan penyampaian TP
+      - Pertanyaan pemantik
+
+   b. Kegiatan Inti ({int(data.alokasi_waktu * 0.7)} menit):
+      - Langkah-langkah detail sesuai sintak model pembelajaran
+      - Diferensiasi untuk kebutuhan belajar yang berbeda
+      - Aktivitas kolaboratif dan mandiri
+
+   c. Penutup ({int(data.alokasi_waktu * 0.15)} menit):
+      - Refleksi peserta didik
+      - Kesimpulan bersama
+      - Asesmen formatif singkat
+      - Tindak lanjut/tugas
+
+9. ASESMEN
+   - Diagnostik: (instrumen awal)
+   - Formatif: (observasi/tugas proses)
+   - Sumatif: (tes/proyek akhir)
+
+10. SUMBER DAN MEDIA PEMBELAJARAN
+    - Buku teks, media digital, alat peraga, dll.
+
+CATATAN PENTING:
+- TP WAJIB minimal 3, format ABCD
+- ATP WAJIB urutan linier dari semua TP
+- Format output: HTML dengan tabel berformat (header #1E3A5F, teks putih). Gunakan LaTeX untuk rumus matematika ($formula$ untuk inline, $$formula$$ untuk block). JANGAN gunakan emoji."""
+        else:
+            return f"""Buatkan RPP (Rencana Pelaksanaan Pembelajaran) format Kurikulum 2013 (K13) dengan format:
+{base_info}
+
+Struktur RPP Kurikulum 2013:
+
+1. IDENTITAS
+   - Satuan Pendidikan, Mata Pelajaran, Kelas/Semester, Materi Pokok, Alokasi Waktu: {data.alokasi_waktu} menit
+
+2. KOMPETENSI INTI (KI)
+   Tuliskan 4 Kompetensi Inti lengkap:
+   - KI-1 (Sikap Spiritual): Menghayati dan mengamalkan ajaran agama yang dianutnya
+   - KI-2 (Sikap Sosial): Menghayati dan mengamalkan perilaku jujur, disiplin, tanggung jawab, peduli, santun, responsif dan pro-aktif...
+   - KI-3 (Pengetahuan): Memahami, menerapkan, menganalisis pengetahuan faktual, konseptual, prosedural berdasarkan rasa ingin tahunya tentang {data.mata_pelajaran}
+   - KI-4 (Keterampilan): Mengolah, menalar, dan menyaji dalam ranah konkret dan ranah abstrak terkait {data.mata_pelajaran}
+
+3. KOMPETENSI DASAR (KD) DAN INDIKATOR PENCAPAIAN KOMPETENSI
+   Tuliskan KD dari KI-3 dan KI-4 yang relevan dengan topik {data.topik}, lengkap dengan:
+   - Nomor KD (misal: 3.1, 4.1)
+   - Rumusan KD
+   - Indikator Pencapaian Kompetensi (minimal 3 indikator per KD, menggunakan kata kerja operasional)
+
+   Tampilkan dalam bentuk tabel:
+   | KD | Indikator Pencapaian Kompetensi |
+   |---|---|
+
+4. TUJUAN PEMBELAJARAN
+   Rumuskan tujuan berdasarkan KD dan indikator di atas (setiap indikator menjadi 1 tujuan).
+
+5. MATERI PEMBELAJARAN
+   Uraikan materi: fakta, konsep, prinsip, dan prosedur yang relevan.
+
+6. METODE PEMBELAJARAN
+   - Pendekatan: Saintifik (5M: Mengamati, Menanya, Mengumpulkan Informasi, Mengasosiasi, Mengkomunikasikan)
+   - Model: (Discovery Learning/Problem Based Learning/dll.)
+   - Metode: (Ceramah, Diskusi, Tanya Jawab, Penugasan, dll.)
+
+7. MEDIA DAN SUMBER BELAJAR
+   - Media: alat peraga, LCD, buku, dll.
+   - Sumber: buku teks, internet, dll.
+
+8. LANGKAH-LANGKAH KEGIATAN PEMBELAJARAN
+   a. Pendahuluan ({int(data.alokasi_waktu * 0.15)} menit):
+      - Salam, doa, presensi
+      - Apersepsi (mengaitkan materi sebelumnya)
+      - Motivasi
+      - Penyampaian tujuan dan cakupan materi
+
+   b. Kegiatan Inti ({int(data.alokasi_waktu * 0.7)} menit):
+      Langkah-langkah sesuai pendekatan Saintifik (5M):
+      - Mengamati: ...
+      - Menanya: ...
+      - Mengumpulkan Informasi: ...
+      - Mengasosiasi: ...
+      - Mengkomunikasikan: ...
+
+   c. Penutup ({int(data.alokasi_waktu * 0.15)} menit):
+      - Kesimpulan bersama
+      - Refleksi
+      - Penugasan/tindak lanjut
+      - Salam penutup
+
+9. PENILAIAN HASIL BELAJAR
+   a. Penilaian Sikap (Observasi): Instrumen lembar observasi
+   b. Penilaian Pengetahuan (Tes Tertulis): Contoh soal + kunci jawaban
+   c. Penilaian Keterampilan (Unjuk Kerja/Proyek): Rubrik penilaian
+
+   Sertakan tabel rubrik penilaian.
+
+Format output: HTML dengan tabel berformat (header #1E3A5F, teks putih). Gunakan LaTeX untuk rumus matematika ($formula$ untuk inline, $$formula$$ untuk block). JANGAN gunakan emoji."""
 
     elif data.doc_type == "lkpd":
         return f"""Buatkan LKPD (Lembar Kerja Peserta Didik) dengan format:

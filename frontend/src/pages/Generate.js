@@ -126,6 +126,30 @@ const Generate = () => {
 
   const SOAL_CHUNK_SIZE = 15;
 
+  const pollGenerationResult = async (taskId, progressLabel) => {
+    const POLL_INTERVAL = 3000; // 3 seconds
+    const MAX_POLLS = 120; // 6 minutes max
+    
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL));
+      setGeneratingProgress(`${progressLabel} (sedang diproses...)`);
+      
+      try {
+        const statusResp = await api.get(`/generate/status/${taskId}`);
+        if (statusResp.data.status === "completed") {
+          return statusResp.data.result;
+        }
+        // If still processing, continue polling
+      } catch (err) {
+        if (err.response?.status === 500) {
+          throw new Error(err.response?.data?.detail || "Generasi gagal di server");
+        }
+        // Network errors - continue polling
+      }
+    }
+    throw new Error("Proses terlalu lama. Cek di menu Riwayat.");
+  };
+
   const handleGenerate = async () => {
     if (!formData.topik.trim()) {
       toast.error("Mohon isi topik/materi pembelajaran");
@@ -170,7 +194,15 @@ const Generate = () => {
           if (docType === "soal" && formData.jumlah_pg > SOAL_CHUNK_SIZE) {
             response = { data: await generateSoalChunked(requestData) };
           } else {
-            response = await api.post("/generate", requestData, { timeout: 180000 });
+            const apiResp = await api.post("/generate", requestData, { timeout: 180000 });
+            
+            // Handle async polling for modul/rpp
+            if (apiResp.data.task_id) {
+              const result = await pollGenerationResult(apiResp.data.task_id, `Membuat ${DOC_TYPE_LABELS[docType]}`);
+              response = { data: result };
+            } else {
+              response = apiResp;
+            }
           }
 
           results.push({
@@ -208,7 +240,15 @@ const Generate = () => {
           response = { data: await generateSoalChunked(requestData) };
         } else {
           setGeneratingProgress(`Membuat ${DOC_TYPE_LABELS[docType]}...`);
-          response = await api.post("/generate", requestData, { timeout: 180000 });
+          const apiResp = await api.post("/generate", requestData, { timeout: 180000 });
+          
+          // Handle async polling for modul/rpp
+          if (apiResp.data.task_id) {
+            const result = await pollGenerationResult(apiResp.data.task_id, `Membuat ${DOC_TYPE_LABELS[docType]}`);
+            response = { data: result };
+          } else {
+            response = apiResp;
+          }
         }
 
         setResult(response.data);
