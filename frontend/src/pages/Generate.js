@@ -127,7 +127,7 @@ const Generate = () => {
       }
       return cost;
     }
-    if (formData.mode_bergambar && selectedDocType === "soal") {
+    if (formData.mode_bergambar && formData.doc_type === "soal") {
       return 3;
     }
     return 1;
