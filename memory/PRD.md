@@ -26,13 +26,13 @@
 - [x] No maxOutputTokens limit
 - [x] **Chunked soal generation** for large question sets (>15 PG)
 - [x] **Export: Excel** (.xlsx via @redoper1/xlsx-js-style)
-- [x] **Export: Word (.docx)** — Backend python-docx with OMML native math equations (LaTeX → MathML → OMML pipeline)
+- [x] **Export: Word (.docx)** — Backend python-docx with OMML native math equations
 - [x] **Export: PDF** (html2pdf.js + KaTeX pre-rendering)
 - [x] **Print** (browser print dialog)
 
 ### Math Rendering Pipeline
 - [x] **In-app**: KaTeX renders $..$ and $$...$$ LaTeX delimiters
-- [x] **Word DOCX export**: LaTeX → MathML (latex2mathml) → OMML (MML2OMML.XSL XSLT) → proper Word equations
+- [x] **Word DOCX export**: LaTeX → MathML → OMML → proper Word equations
 - [x] **PDF export**: KaTeX pre-render → html2pdf.js visual capture
 
 ### Multi-Key Multi-Provider AI System
@@ -48,13 +48,25 @@
 ### Super Admin Panel
 - [x] Dashboard, User management, Transaction monitoring
 - [x] Voucher management, AI Settings
+- [x] **Delete Users** (with cascade delete of related generations & transactions)
+- [x] **Delete Transactions**
+- [x] **Delete Generations** (individual + bulk delete all)
+- [x] **Delete AI Keys**
+- [x] **Generations management tab** — view & manage all generated documents
+
+### Security
+- [x] **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy, Content-Security-Policy, HSTS, Cache-Control
+- [x] **XSS Input Sanitization**: sanitize_string for user inputs (name, phone, school)
+- [x] **Auth bypass protection**: All admin endpoints require valid JWT with super_admin role (returns 401)
 
 ## Key Files
 - `/app/backend/docx_export.py` — HTML→DOCX converter with OMML math
-- `/app/backend/MML2OMML.XSL` — Microsoft MathML→OMML XSLT
-- `/app/backend/routes/generate_routes.py` — /export/docx/{id} endpoint
-- `/app/frontend/src/utils/latexRenderer.js` — KaTeX rendering + LaTeX→Unicode fallback
-- `/app/frontend/src/utils/exportPdf.js` — PDF export with KaTeX pre-rendering
+- `/app/backend/security.py` — XSS sanitization utilities
+- `/app/backend/routes/admin_routes.py` — Admin CRUD + DELETE endpoints
+- `/app/backend/routes/generate_routes.py` — /export/docx endpoint, chunked generation
+- `/app/frontend/src/pages/SuperAdmin.js` — Full admin panel UI
+- `/app/frontend/src/utils/latexRenderer.js` — KaTeX rendering
+- `/app/frontend/src/utils/exportPdf.js` — PDF export
 
 ## API Credentials
 - **Super Admin**: ipankpaul107@gmail.com / Kakiku5.
