@@ -232,6 +232,21 @@ const AdminUsers = () => {
     }
   };
 
+  const [deletingUserId, setDeletingUserId] = useState(null);
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Yakin ingin menghapus user "${userName}"? Semua data terkait (generasi, transaksi) juga akan dihapus. Tindakan ini tidak dapat dibatalkan.`)) return;
+    setDeletingUserId(userId);
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      toast.success("User dan data terkait berhasil dihapus");
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal menghapus user");
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center">Memuat...</div>;
 
   return (
@@ -287,13 +302,32 @@ const AdminUsers = () => {
                   </TableCell>
                   <TableCell>{formatShortDate(user.created_at)}</TableCell>
                   <TableCell>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => { setEditingUser(user.id); setEditTokens(user.token_balance); }}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => { setEditingUser(user.id); setEditTokens(user.token_balance); }}
+                        data-testid={`edit-user-${user.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      {user.role !== "super_admin" && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDeleteUser(user.id, user.name)}
+                          disabled={deletingUserId === user.id}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          data-testid={`delete-user-${user.id}`}
+                        >
+                          {deletingUserId === user.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -349,6 +383,21 @@ const AdminTransactions = () => {
       fetchTransactions();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Gagal menolak transaksi");
+    }
+  };
+
+  const [deletingTxId, setDeletingTxId] = useState(null);
+  const handleDeleteTransaction = async (transactionId) => {
+    if (!window.confirm("Yakin ingin menghapus transaksi ini? Tindakan ini tidak dapat dibatalkan.")) return;
+    setDeletingTxId(transactionId);
+    try {
+      await api.delete(`/admin/transactions/${transactionId}`);
+      toast.success("Transaksi berhasil dihapus");
+      fetchTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal menghapus transaksi");
+    } finally {
+      setDeletingTxId(null);
     }
   };
 
@@ -442,31 +491,175 @@ const AdminTransactions = () => {
                   </TableCell>
                   <TableCell className="text-xs">{formatShortDate(tx.created_at)}</TableCell>
                   <TableCell>
-                    {(tx.status === "waiting_verification" || (tx.status === "pending" && tx.payment_type === "bank_transfer")) && (
-                      <div className="flex gap-1">
-                        <Button 
-                          size="sm" 
-                          className="bg-green-600 hover:bg-green-700 h-7 text-xs px-2"
-                          onClick={() => handleVerify(tx.id)}
-                          disabled={verifyingId === tx.id}
-                          data-testid={`verify-${tx.order_id}`}
-                        >
-                          {verifyingId === tx.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="h-7 text-xs px-2 text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => handleReject(tx.id)}
-                          data-testid={`reject-${tx.order_id}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-1">
+                      {(tx.status === "waiting_verification" || (tx.status === "pending" && tx.payment_type === "bank_transfer")) && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 h-7 text-xs px-2"
+                            onClick={() => handleVerify(tx.id)}
+                            disabled={verifyingId === tx.id}
+                            data-testid={`verify-${tx.order_id}`}
+                          >
+                            {verifyingId === tx.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-7 text-xs px-2 text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => handleReject(tx.id)}
+                            data-testid={`reject-${tx.order_id}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        className="h-7 text-xs px-2 text-red-600 hover:bg-red-50"
+                        onClick={() => handleDeleteTransaction(tx.id)}
+                        disabled={deletingTxId === tx.id}
+                        data-testid={`delete-tx-${tx.order_id}`}
+                      >
+                        {deletingTxId === tx.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Admin Generations Component
+const AdminGenerations = () => {
+  const [generations, setGenerations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const [deletingAll, setDeletingAll] = useState(false);
+
+  useEffect(() => {
+    fetchGenerations();
+  }, []);
+
+  const fetchGenerations = async () => {
+    try {
+      const response = await api.get("/admin/generations");
+      setGenerations(response.data.generations);
+    } catch (error) {
+      console.error("Failed to fetch generations", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (genId) => {
+    if (!window.confirm("Yakin ingin menghapus generasi ini?")) return;
+    setDeletingId(genId);
+    try {
+      await api.delete(`/admin/generations/${genId}`);
+      toast.success("Generasi berhasil dihapus");
+      fetchGenerations();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal menghapus generasi");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm("PERINGATAN: Semua data generasi akan dihapus permanen. Lanjutkan?")) return;
+    setDeletingAll(true);
+    try {
+      const res = await api.delete("/admin/generations");
+      toast.success(res.data.message);
+      fetchGenerations();
+    } catch (error) {
+      toast.error("Gagal menghapus semua generasi");
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center">Memuat...</div>;
+
+  return (
+    <div className="p-6" data-testid="admin-generations">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-[#1E3A5F]">Riwayat Generasi</h1>
+        {generations.length > 0 && (
+          <Button 
+            variant="outline" 
+            className="text-red-600 border-red-200 hover:bg-red-50"
+            onClick={handleDeleteAll}
+            disabled={deletingAll}
+            data-testid="delete-all-generations"
+          >
+            {deletingAll ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+            Hapus Semua
+          </Button>
+        )}
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Jenis</TableHead>
+                <TableHead>Topik</TableHead>
+                <TableHead>Mata Pelajaran</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {generations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-slate-400 py-8">Belum ada data generasi</TableCell>
+                </TableRow>
+              ) : (
+                generations.map((gen) => (
+                  <TableRow key={gen.id}>
+                    <TableCell>
+                      <Badge className="bg-[#1E3A5F]/10 text-[#1E3A5F]">
+                        {DOC_TYPE_LABELS[gen.doc_type] || gen.doc_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">{gen.form_data?.topik || "-"}</TableCell>
+                    <TableCell>{gen.form_data?.mata_pelajaran || "-"}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm font-medium">{gen.user_name || "-"}</p>
+                        <p className="text-xs text-slate-500">{gen.user_email || "-"}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs">{formatShortDate(gen.created_at)}</TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDelete(gen.id)}
+                        disabled={deletingId === gen.id}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        data-testid={`delete-gen-${gen.id}`}
+                      >
+                        {deletingId === gen.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -1000,6 +1193,7 @@ const SuperAdmin = () => {
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Dashboard", path: "/super-admin" },
     { icon: <Users className="w-5 h-5" />, label: "Users", path: "/super-admin/users" },
     { icon: <CreditCard className="w-5 h-5" />, label: "Transaksi", path: "/super-admin/transactions" },
+    { icon: <FileText className="w-5 h-5" />, label: "Generasi", path: "/super-admin/generations" },
     { icon: <Gift className="w-5 h-5" />, label: "Voucher", path: "/super-admin/vouchers" },
     { icon: <Bot className="w-5 h-5" />, label: "AI Settings", path: "/super-admin/ai-settings" },
   ];
@@ -1089,6 +1283,7 @@ const SuperAdmin = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="transactions" element={<AdminTransactions />} />
+          <Route path="generations" element={<AdminGenerations />} />
           <Route path="vouchers" element={<AdminVouchers />} />
           <Route path="ai-settings" element={<AdminAISettings />} />
         </Routes>

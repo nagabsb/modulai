@@ -5,6 +5,7 @@ import uuid
 from database import db
 from auth import hash_password, verify_password, create_jwt_token, get_current_user
 from models import UserRegister, UserLogin, ForgotPasswordRequest, ResetPasswordRequest
+from security import sanitize_string
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,15 +20,18 @@ async def register(data: UserRegister):
         raise HTTPException(status_code=400, detail="Email sudah terdaftar")
 
     user_id = str(uuid.uuid4())
+    safe_name = sanitize_string(data.name)
+    safe_phone = sanitize_string(data.phone) if data.phone else None
+    safe_school = sanitize_string(data.school_name) if data.school_name else None
     user = {
         "id": user_id,
         "email": data.email,
         "password_hash": hash_password(data.password),
-        "name": data.name,
+        "name": safe_name,
         "role": "user",
         "token_balance": 5,
-        "phone": data.phone,
-        "school_name": data.school_name,
+        "phone": safe_phone,
+        "school_name": safe_school,
         "is_active": True,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -42,7 +46,7 @@ async def register(data: UserRegister):
         "user": {
             "id": user_id,
             "email": data.email,
-            "name": data.name,
+            "name": safe_name,
             "role": "user",
             "token_balance": 5
         }
