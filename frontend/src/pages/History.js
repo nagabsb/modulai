@@ -7,6 +7,7 @@ import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import api from "../utils/api";
+import { toast } from "sonner";
 import { DOC_TYPE_LABELS, formatShortDate } from "../utils/constants";
 import { 
   ArrowLeft, 
@@ -22,7 +23,9 @@ import {
   ShoppingCart,
   LogOut,
   Menu,
-  X
+  X,
+  Trash2,
+  Loader2
 } from "lucide-react";
 
 const History = () => {
@@ -33,6 +36,7 @@ const History = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchGenerations();
@@ -46,6 +50,21 @@ const History = () => {
       console.error("Failed to fetch generations", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (e, genId) => {
+    e.stopPropagation();
+    if (!window.confirm("Yakin ingin menghapus dokumen ini? Tindakan ini tidak dapat dibatalkan.")) return;
+    setDeletingId(genId);
+    try {
+      await api.delete(`/generations/${genId}`);
+      toast.success("Dokumen berhasil dihapus");
+      setGenerations(prev => prev.filter(g => g.id !== genId));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal menghapus dokumen");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -219,6 +238,20 @@ const History = () => {
                     <span className="text-sm text-slate-400 hidden md:block">
                       {formatShortDate(gen.created_at)}
                     </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-slate-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 shrink-0"
+                      onClick={(e) => handleDelete(e, gen.id)}
+                      disabled={deletingId === gen.id}
+                      data-testid={`delete-history-${gen.id}`}
+                    >
+                      {deletingId === gen.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </Button>
                     <ChevronRight className="w-5 h-5 text-slate-300" />
                   </CardContent>
                 </Card>

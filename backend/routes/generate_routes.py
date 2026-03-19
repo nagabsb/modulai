@@ -300,6 +300,14 @@ async def get_generation(generation_id: str, user: dict = Depends(get_current_us
     return generation
 
 
+@router.delete("/generations/{generation_id}")
+async def delete_generation(generation_id: str, user: dict = Depends(get_current_user)):
+    result = await db.generations.delete_one({"id": generation_id, "user_id": user["id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Dokumen tidak ditemukan")
+    return {"message": "Dokumen berhasil dihapus"}
+
+
 @router.post("/generate/multi")
 async def generate_multi_documents(data: MultiGenerateRequest, user: dict = Depends(get_current_user)):
     tokens_needed = len(data.doc_types)

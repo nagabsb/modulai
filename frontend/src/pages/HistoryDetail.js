@@ -20,7 +20,8 @@ import {
   BookOpen,
   Loader2,
   FileSpreadsheet,
-  FileDown
+  FileDown,
+  Trash2
 } from "lucide-react";
 
 const HistoryDetail = () => {
@@ -130,6 +131,20 @@ const HistoryDetail = () => {
     navigate(`/generate?${params.toString()}`);
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!window.confirm("Yakin ingin menghapus dokumen ini? Tindakan ini tidak dapat dibatalkan.")) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/generations/${id}`);
+      toast.success("Dokumen berhasil dihapus");
+      navigate("/history");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal menghapus dokumen");
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -188,6 +203,16 @@ const HistoryDetail = () => {
             <Button variant="outline" onClick={handlePrint} data-testid="btn-print-detail">
               <Printer className="w-4 h-4 mr-2" />
               Cetak
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleDelete} 
+              disabled={deleting}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+              data-testid="btn-delete-detail"
+            >
+              {deleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Hapus
             </Button>
           </div>
         </div>

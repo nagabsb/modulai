@@ -54,6 +54,9 @@
 - [x] **Delete AI Keys**
 - [x] **Generations management tab** — view & manage all generated documents
 
+### User Features
+- [x] **Delete own generations** — from History list and Detail page
+
 ### Security
 - [x] **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy, Content-Security-Policy, HSTS, Cache-Control
 - [x] **XSS Input Sanitization**: sanitize_string for user inputs (name, phone, school)
