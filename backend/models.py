@@ -57,6 +57,8 @@ class GenerateRequest(BaseModel):
     soal_section: Optional[str] = None  # "pg", "non_pg", None=all
     pg_numbering_start: Optional[int] = 1
     is_chunk: Optional[bool] = False  # If True, no token deduction, no save
+    # Image generation
+    mode_bergambar: Optional[bool] = False
 
 
 class SaveGenerationRequest(BaseModel):

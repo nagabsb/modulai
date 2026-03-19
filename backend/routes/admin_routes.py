@@ -231,6 +231,86 @@ async def admin_delete_ai_key(key_id: str, admin: dict = Depends(get_admin_user)
     return {"message": "Key berhasil dihapus"}
 
 
+# --- Image Generation Keys Management ---
+
+class ImageKeyCreate(BaseModel):
+    provider: str
+    model: str
+    api_key: str
+    label: Optional[str] = None
+
+
+class ImageKeyUpdate(BaseModel):
+    is_active: Optional[bool] = None
+    priority: Optional[int] = None
+    label: Optional[str] = None
+
+
+@router.get("/image-keys")
+async def admin_get_image_keys(admin: dict = Depends(get_admin_user)):
+    keys = await db.image_keys.find({}, {"_id": 0}).sort("priority", 1).to_list(100)
+    for k in keys:
+        raw = k.get("api_key", "")
+        k["api_key_masked"] = f"{raw[:8]}...{raw[-4:]}" if len(raw) > 12 else "***"
+        del k["api_key"]
+    return keys
+
+
+@router.post("/image-keys")
+async def admin_create_image_key(data: ImageKeyCreate, admin: dict = Depends(get_admin_user)):
+    from config import IMAGE_PROVIDERS
+    if data.provider not in IMAGE_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Provider tidak dikenal: {data.provider}")
+    if data.model not in IMAGE_PROVIDERS[data.provider]["models"]:
+        raise HTTPException(status_code=400, detail=f"Model tidak valid untuk {data.provider}: {data.model}")
+
+    max_priority = await db.image_keys.find_one(sort=[("priority", -1)])
+    next_priority = (max_priority.get("priority", 0) + 1) if max_priority else 1
+
+    model_info = IMAGE_PROVIDERS[data.provider]["models"][data.model]
+    key_doc = {
+        "id": str(uuid.uuid4()),
+        "provider": data.provider,
+        "model": data.model,
+        "api_key": data.api_key,
+        "label": data.label or f"{model_info['name']} Key {next_priority}",
+        "priority": next_priority,
+        "is_active": True,
+        "usage_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.image_keys.insert_one(key_doc)
+    key_doc.pop("_id", None)
+    key_doc["api_key_masked"] = f"{data.api_key[:8]}...{data.api_key[-4:]}" if len(data.api_key) > 12 else "***"
+    del key_doc["api_key"]
+    return key_doc
+
+
+@router.put("/image-keys/{key_id}")
+async def admin_update_image_key(key_id: str, data: ImageKeyUpdate, admin: dict = Depends(get_admin_user)):
+    update_data = {}
+    if data.is_active is not None:
+        update_data["is_active"] = data.is_active
+    if data.priority is not None:
+        update_data["priority"] = data.priority
+    if data.label is not None:
+        update_data["label"] = data.label
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Tidak ada data untuk diupdate")
+    result = await db.image_keys.update_one({"id": key_id}, {"$set": update_data})
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Key tidak ditemukan")
+    return {"message": "Key berhasil diupdate"}
+
+
+@router.delete("/image-keys/{key_id}")
+async def admin_delete_image_key(key_id: str, admin: dict = Depends(get_admin_user)):
+    result = await db.image_keys.delete_one({"id": key_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Key tidak ditemukan")
+    return {"message": "Key berhasil dihapus"}
+
+
 @router.post("/vouchers")
 async def admin_create_voucher(admin: dict = Depends(get_admin_user), code: str = "", discount_type: str = "fixed", discount_value: int = 0, expires_at: Optional[str] = None):
     voucher = {

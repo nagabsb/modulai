@@ -13,6 +13,7 @@ from auth import get_current_user
 from models import GenerateRequest, MultiGenerateRequest, SaveGenerationRequest
 from prompts import build_prompt
 from docx_export import html_to_docx
+from image_gen import add_images_to_soal
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,18 @@ async def process_generation_task(task_id: str, data_dict: dict, user_id: str):
         result_html = re.sub(r'^```html?\n?', '', result_html)
         result_html = re.sub(r'\n?```$', '', result_html)
 
+        # If mode_bergambar is enabled for soal, generate images
+        if data.mode_bergambar and data.doc_type == "soal":
+            try:
+                result_html = await add_images_to_soal(
+                    result_html, data.mata_pelajaran, data.topik
+                )
+            except Exception as img_err:
+                logger.error(f"Image generation failed: {img_err}")
+                # Continue without images
+
+        tokens_needed = 3 if (data.mode_bergambar and data.doc_type == "soal") else 1
+
         generation_id = str(uuid.uuid4())
         generation = {
             "id": generation_id,
@@ -192,14 +205,14 @@ async def process_generation_task(task_id: str, data_dict: dict, user_id: str):
             "doc_type": data.doc_type,
             "form_data": data.model_dump(),
             "result_html": result_html,
-            "tokens_used": 1,
+            "tokens_used": tokens_needed,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.generations.insert_one(generation)
 
         await db.users.update_one(
             {"id": user_id},
-            {"$inc": {"token_balance": -1}}
+            {"$inc": {"token_balance": -tokens_needed}}
         )
 
         updated_user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -211,7 +224,7 @@ async def process_generation_task(task_id: str, data_dict: dict, user_id: str):
                 "result": {
                     "id": generation_id,
                     "result_html": result_html,
-                    "tokens_used": 1,
+                    "tokens_used": tokens_needed,
                     "remaining_tokens": updated_user["token_balance"]
                 },
                 "completed_at": datetime.now(timezone.utc).isoformat()
@@ -245,13 +258,17 @@ async def get_generation_status(task_id: str, user: dict = Depends(get_current_u
 
 @router.post("/generate")
 async def generate_document(data: GenerateRequest, user: dict = Depends(get_current_user)):
+    # Calculate token cost: 3 for soal with images, 1 for everything else
+    tokens_needed = 3 if (data.mode_bergambar and data.doc_type == "soal") else 1
+
     # For chunk calls, skip token check/deduction
     if not data.is_chunk:
-        if user["token_balance"] < 1:
+        if user["token_balance"] < tokens_needed:
             raise HTTPException(status_code=402, detail="Token tidak mencukupi. Silakan top up.")
 
-    # For long-running doc types (modul, rpp), use async background task
-    if data.doc_type in ASYNC_DOC_TYPES and not data.is_chunk:
+    # For long-running doc types or soal with images, use async background task
+    needs_async = data.doc_type in ASYNC_DOC_TYPES or (data.mode_bergambar and data.doc_type == "soal")
+    if needs_async and not data.is_chunk:
         task_id = str(uuid.uuid4())
         task = {
             "id": task_id,
@@ -260,10 +277,7 @@ async def generate_document(data: GenerateRequest, user: dict = Depends(get_curr
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.tasks.insert_one(task)
-
-        # Start background task
         asyncio.create_task(process_generation_task(task_id, data.model_dump(), user["id"]))
-
         return {"task_id": task_id, "status": "processing"}
 
     prompt = build_prompt(data)
@@ -283,21 +297,21 @@ async def generate_document(data: GenerateRequest, user: dict = Depends(get_curr
         "doc_type": data.doc_type,
         "form_data": data.model_dump(),
         "result_html": result_html,
-        "tokens_used": 1,
+        "tokens_used": tokens_needed,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.generations.insert_one(generation)
 
     await db.users.update_one(
         {"id": user["id"]},
-        {"$inc": {"token_balance": -1}}
+        {"$inc": {"token_balance": -tokens_needed}}
     )
 
     return {
         "id": generation_id,
         "result_html": result_html,
-        "tokens_used": 1,
-        "remaining_tokens": user["token_balance"] - 1
+        "tokens_used": tokens_needed,
+        "remaining_tokens": user["token_balance"] - tokens_needed
     }
 
 

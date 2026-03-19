@@ -33,7 +33,13 @@
 - [x] **Export: PDF** (html2pdf.js + KaTeX pre-rendering)
 - [x] **Print** (browser print dialog)
 
-### Math Rendering Pipeline
+### Image Generation (Mode Bergambar)
+- [x] **Admin panel section** — Manage Image API keys (CRUD) terpisah dari text AI keys
+- [x] **Toggle "Mode Bergambar"** di form generate soal
+- [x] **Token cost**: 3 token untuk soal bergambar (vs 1 token biasa)
+- [x] **Gemini Imagen API** — generate ilustrasi per soal (320x220px, center aligned)
+- [x] **Async generation** — soal bergambar pakai background task + polling
+- [x] **Model support**: Imagen 4.0, Imagen 4.0 Fast, Imagen 4.0 Ultra
 - [x] **In-app**: KaTeX renders $..$ and $$...$$ LaTeX delimiters
 - [x] **Word DOCX export**: LaTeX → MathML → OMML → proper Word equations
 - [x] **PDF export**: KaTeX pre-render → html2pdf.js visual capture

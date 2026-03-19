@@ -52,7 +52,8 @@ import {
   Check,
   Plus,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ImageIcon
 } from "lucide-react";
 
 // Admin Dashboard Component
@@ -861,18 +862,44 @@ const AdminAISettings = () => {
     label: ""
   });
 
+  // Image keys state
+  const [imageKeys, setImageKeys] = useState([]);
+  const [showAddImageForm, setShowAddImageForm] = useState(false);
+  const [showImageKey, setShowImageKey] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState(null);
+  const IMAGE_PROVIDERS = {
+    "gemini-imagen": {
+      name: "Google Imagen",
+      models: {
+        "imagen-4.0-generate-001": { name: "Imagen 4.0", price_per_image: 0.02, desc: "Kualitas tinggi, standard" },
+        "imagen-4.0-fast-generate-001": { name: "Imagen 4.0 Fast", price_per_image: 0.01, desc: "Cepat & murah" },
+        "imagen-4.0-ultra-generate-001": { name: "Imagen 4.0 Ultra", price_per_image: 0.06, desc: "Kualitas tertinggi" },
+      },
+      key_url: "https://aistudio.google.com/apikey"
+    }
+  };
+  const [newImageKey, setNewImageKey] = useState({
+    provider: "gemini-imagen",
+    model: "imagen-4.0-generate-001",
+    api_key: "",
+    label: ""
+  });
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const [keysRes, providersRes] = await Promise.all([
+      const [keysRes, providersRes, imageKeysRes] = await Promise.all([
         api.get("/admin/ai-keys"),
-        api.get("/ai-providers")
+        api.get("/ai-providers"),
+        api.get("/admin/image-keys")
       ]);
       setKeys(keysRes.data);
       setProviders(providersRes.data);
+      setImageKeys(imageKeysRes.data);
     } catch (error) {
       console.error("Failed to fetch AI settings", error);
     } finally {
@@ -938,6 +965,52 @@ const AdminAISettings = () => {
   };
 
   const availableModels = providers[newKey.provider]?.models || {};
+
+  // Image key handlers
+  const handleAddImageKey = async () => {
+    if (!newImageKey.api_key) {
+      toast.error("API key wajib diisi");
+      return;
+    }
+    setSavingImage(true);
+    try {
+      await api.post("/admin/image-keys", newImageKey);
+      toast.success("Image API key berhasil ditambahkan!");
+      setNewImageKey({ provider: "gemini-imagen", model: "imagen-4.0-generate-001", api_key: "", label: "" });
+      setShowAddImageForm(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Gagal menambahkan key");
+    } finally {
+      setSavingImage(false);
+    }
+  };
+
+  const toggleImageKey = async (keyId, currentStatus) => {
+    try {
+      await api.put(`/admin/image-keys/${keyId}`, { is_active: !currentStatus });
+      toast.success(`Key ${!currentStatus ? 'diaktifkan' : 'dinonaktifkan'}`);
+      fetchData();
+    } catch (error) {
+      toast.error("Gagal mengubah status key");
+    }
+  };
+
+  const deleteImageKey = async (keyId) => {
+    if (!window.confirm("Yakin ingin menghapus image key ini?")) return;
+    setDeletingImageId(keyId);
+    try {
+      await api.delete(`/admin/image-keys/${keyId}`);
+      toast.success("Key berhasil dihapus");
+      fetchData();
+    } catch (error) {
+      toast.error("Gagal menghapus key");
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
+  const availableImageModels = IMAGE_PROVIDERS[newImageKey.provider]?.models || {};
 
   if (loading) return <div className="p-8 text-center">Memuat...</div>;
 
@@ -1176,6 +1249,157 @@ const AdminAISettings = () => {
               </TableBody>
             </Table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Image Generation Keys Section */}
+      <Card className="border-amber-200">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-amber-500" />
+              Image Generation (Mode Bergambar)
+            </CardTitle>
+            <Button 
+              onClick={() => setShowAddImageForm(!showAddImageForm)} 
+              className="bg-amber-500 hover:bg-amber-600"
+              data-testid="btn-add-image-key"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Tambah Image Key
+            </Button>
+          </div>
+          <p className="text-sm text-slate-500">
+            API key untuk generate ilustrasi soal. Gunakan key Gemini yang sama (bisa dipakai untuk text & gambar).
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add Image Key Form */}
+          {showAddImageForm && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Provider</Label>
+                  <Select 
+                    value={newImageKey.provider} 
+                    onValueChange={(v) => {
+                      const firstModel = Object.keys(IMAGE_PROVIDERS[v]?.models || {})[0] || "";
+                      setNewImageKey({ ...newImageKey, provider: v, model: firstModel });
+                    }}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(IMAGE_PROVIDERS).map(([key, p]) => (
+                        <SelectItem key={key} value={key}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Model</Label>
+                  <Select value={newImageKey.model} onValueChange={(v) => setNewImageKey({ ...newImageKey, model: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(availableImageModels).map(([key, m]) => (
+                        <SelectItem key={key} value={key}>
+                          {m.name} — ${m.price_per_image}/gambar
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>API Key</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type={showImageKey ? "text" : "password"}
+                    placeholder="Masukkan Gemini API key..."
+                    value={newImageKey.api_key}
+                    onChange={(e) => setNewImageKey({ ...newImageKey, api_key: e.target.value })}
+                    className="font-mono"
+                    data-testid="input-image-api-key"
+                  />
+                  <Button variant="outline" onClick={() => setShowImageKey(!showImageKey)}>
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-amber-600">
+                  Key yang sama dengan Gemini text generation bisa dipakai. Dapatkan di: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="underline">aistudio.google.com/apikey</a>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Label (opsional)</Label>
+                <Input
+                  placeholder="Contoh: Imagen Key Utama"
+                  value={newImageKey.label}
+                  onChange={(e) => setNewImageKey({ ...newImageKey, label: e.target.value })}
+                  data-testid="input-image-key-label"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleAddImageKey} disabled={savingImage} className="bg-amber-500 hover:bg-amber-600">
+                  {savingImage ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                  Simpan Key
+                </Button>
+                <Button variant="outline" onClick={() => setShowAddImageForm(false)}>Batal</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Image Keys List */}
+          {imageKeys.length === 0 ? (
+            <div className="text-center py-6 text-slate-400">
+              <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p>Belum ada Image API key. Tambahkan key untuk mengaktifkan Mode Bergambar.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {imageKeys.map((key) => {
+                const provInfo = IMAGE_PROVIDERS[key.provider];
+                const modelInfo = provInfo?.models?.[key.model];
+                return (
+                  <div 
+                    key={key.id}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                      key.is_active ? "border-amber-200 bg-amber-50/30" : "border-slate-100 bg-slate-50 opacity-60"
+                    }`}
+                    data-testid={`image-key-${key.id}`}
+                  >
+                    <ImageIcon className="w-8 h-8 text-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold truncate">{key.label}</span>
+                        <Badge className="bg-amber-100 text-amber-700 text-xs shrink-0">
+                          {provInfo?.name || key.provider}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span className="font-mono">{key.api_key_masked}</span>
+                        <span>{modelInfo?.name || key.model}</span>
+                        {modelInfo && (
+                          <span className="text-green-600 font-medium">${modelInfo.price_per_image}/gambar</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Switch
+                        checked={key.is_active}
+                        onCheckedChange={() => toggleImageKey(key.id, key.is_active)}
+                      />
+                      <Button 
+                        size="sm" variant="outline" 
+                        className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
+                        onClick={() => deleteImageKey(key.id)}
+                        disabled={deletingImageId === key.id}
+                      >
+                        {deletingImageId === key.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

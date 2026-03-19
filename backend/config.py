@@ -49,3 +49,16 @@ AI_PROVIDERS = {
         "key_url": "https://platform.openai.com/api-keys"
     },
 }
+
+# Image generation providers
+IMAGE_PROVIDERS = {
+    "gemini-imagen": {
+        "name": "Google Imagen",
+        "models": {
+            "imagen-4.0-generate-001": {"name": "Imagen 4.0", "price_per_image": 0.02, "desc": "Kualitas tinggi, standard"},
+            "imagen-4.0-fast-generate-001": {"name": "Imagen 4.0 Fast", "price_per_image": 0.01, "desc": "Cepat & murah"},
+            "imagen-4.0-ultra-generate-001": {"name": "Imagen 4.0 Ultra", "price_per_image": 0.06, "desc": "Kualitas tertinggi"},
+        },
+        "key_url": "https://aistudio.google.com/apikey"
+    },
+}

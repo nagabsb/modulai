@@ -42,7 +42,8 @@ import {
   FileSpreadsheet,
   FileDown,
   Zap,
-  Layers
+  Layers,
+  ImageIcon
 } from "lucide-react";
 
 import "katex/dist/katex.min.css";
@@ -77,6 +78,7 @@ const Generate = () => {
     jumlah_isian: 5,
     jumlah_essay: 3,
     sertakan_pembahasan: true,
+    mode_bergambar: false,
     use_custom_values: false,
     resistor1: "",
     resistor2: "",
@@ -119,7 +121,14 @@ const Generate = () => {
 
   const getTokenCost = () => {
     if (isMultiMode) {
-      return selectedDocTypes.length;
+      let cost = selectedDocTypes.length;
+      if (selectedDocTypes.includes("soal") && formData.mode_bergambar) {
+        cost += 2; // soal bergambar: 3 instead of 1, so +2
+      }
+      return cost;
+    }
+    if (formData.mode_bergambar && selectedDocType === "soal") {
+      return 3;
     }
     return 1;
   };
@@ -799,6 +808,21 @@ const Generate = () => {
                     <Label htmlFor="pembahasan" className="cursor-pointer">
                       Sertakan Kunci Jawaban dan Pembahasan Detail
                     </Label>
+                  </div>
+
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <Checkbox
+                      id="bergambar"
+                      checked={formData.mode_bergambar}
+                      onCheckedChange={(checked) => setFormData({ ...formData, mode_bergambar: checked })}
+                      data-testid="checkbox-bergambar"
+                    />
+                    <Label htmlFor="bergambar" className="cursor-pointer flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-amber-600" />
+                      <span className="font-medium text-amber-800">Mode Bergambar</span>
+                      <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">3 Token</span>
+                    </Label>
+                    <p className="text-xs text-amber-600 ml-auto">AI generate ilustrasi per soal</p>
                   </div>
 
                   {/* Physics custom values */}
