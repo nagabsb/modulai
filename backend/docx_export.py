@@ -257,13 +257,31 @@ class HTMLToDocxParser(HTMLParser):
 
         elif tag == 'hr':
             self._flush_text()
-            p = self.doc.add_paragraph()
-            _set_spacing(p, before=4, after=4)
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run('─' * 60)
+            hr_p = self.doc.add_paragraph()
+            _set_spacing(hr_p, before=4, after=4)
+            hr_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = hr_p.add_run('─' * 60)
             run.font.color.rgb = RGBColor(0x1E, 0x3A, 0x5F)
             run.font.size = Pt(8)
             self.current_paragraph = None
+
+        elif tag == 'img':
+            self._flush_text()
+            src = attrs_dict.get('src', '')
+            if src.startswith('data:image/'):
+                try:
+                    import base64
+                    header, b64data = src.split(',', 1)
+                    img_bytes = base64.b64decode(b64data)
+                    img_stream = io.BytesIO(img_bytes)
+                    if not self.current_paragraph:
+                        self.current_paragraph = self._new_paragraph()
+                    self.current_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = self.current_paragraph.add_run()
+                    run.add_picture(img_stream, width=Cm(8))
+                    self.current_paragraph = self._new_paragraph()
+                except Exception:
+                    pass
 
         elif tag in ('strong', 'b'):
             self._flush_text()
