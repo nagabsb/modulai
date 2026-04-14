@@ -13,7 +13,7 @@ from auth import get_current_user
 from models import GenerateRequest, MultiGenerateRequest, SaveGenerationRequest
 from prompts import build_prompt
 from docx_export import html_to_docx
-from image_gen import add_images_to_soal
+from image_gen import generate_soal_bergambar, fallback_add_images
 
 logger = logging.getLogger(__name__)
 
@@ -180,21 +180,37 @@ async def process_generation_task(task_id: str, data_dict: dict, user_id: str):
     """Background task to generate document and store result"""
     try:
         data = GenerateRequest(**data_dict)
-        prompt = build_prompt(data)
-        result_html = await generate_with_ai(prompt)
 
-        result_html = re.sub(r'^```html?\n?', '', result_html)
-        result_html = re.sub(r'\n?```$', '', result_html)
-
-        # If mode_bergambar is enabled for soal, generate images
+        # If mode_bergambar is enabled for soal, use Gemini Flash Image
         if data.mode_bergambar and data.doc_type == "soal":
             try:
-                result_html = await add_images_to_soal(
-                    result_html, data.mata_pelajaran, data.topik
-                )
+                # Primary: Gemini 2.5 Flash Image (text + images in 1 call)
+                result_html = await generate_soal_bergambar(data)
+                logger.info("Bergambar: Gemini Flash Image succeeded")
             except Exception as img_err:
-                logger.error(f"Image generation failed: {img_err}")
-                # Continue without images
+                logger.warning(f"Gemini Flash Image failed: {img_err}, trying fallback")
+                try:
+                    # Fallback: Kimi text + Imagen images
+                    prompt = build_prompt(data)
+                    result_html = await generate_with_ai(prompt)
+                    result_html = re.sub(r'^```html?\n?', '', result_html)
+                    result_html = re.sub(r'\n?```$', '', result_html)
+                    result_html = await fallback_add_images(
+                        result_html, data.mata_pelajaran, data.topik
+                    )
+                    logger.info("Bergambar: Fallback (Kimi + Imagen) succeeded")
+                except Exception as fb_err:
+                    logger.error(f"Fallback also failed: {fb_err}")
+                    # Last resort: just generate text without images
+                    prompt = build_prompt(data)
+                    result_html = await generate_with_ai(prompt)
+                    result_html = re.sub(r'^```html?\n?', '', result_html)
+                    result_html = re.sub(r'\n?```$', '', result_html)
+        else:
+            prompt = build_prompt(data)
+            result_html = await generate_with_ai(prompt)
+            result_html = re.sub(r'^```html?\n?', '', result_html)
+            result_html = re.sub(r'\n?```$', '', result_html)
 
         tokens_needed = 3 if (data.mode_bergambar and data.doc_type == "soal") else 1
 
